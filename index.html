@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Board</title>
+<style>
+:root {
+  --bg: #f6f5f2; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6a66; --line: #e4e2dc;
+  --working: #2f6fdb; --needs: #d9480f; --waiting: #b7791f; --done: #2b8a3e; --ended: #868e96;
+  --chip: #efede8;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161615; --card: #1f1f1d; --ink: #ecebe6; --muted: #9a9890; --line: #2f2e2b;
+    --working: #6b9bff; --needs: #ff8a4c; --waiting: #e3b341; --done: #57c26d; --ended: #8a8f96;
+    --chip: #2a2a27;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Inter", sans-serif; }
+header { display: flex; align-items: baseline; gap: 16px; padding: 20px 24px 8px; flex-wrap: wrap; }
+h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+.meta { color: var(--muted); font-size: 12px; }
+.filters { display: flex; gap: 8px; padding: 8px 24px 16px; flex-wrap: wrap; }
+.filters button { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.filters button.on { border-color: var(--ink); }
+.filters .n { color: var(--muted); margin-left: 4px; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; padding: 0 24px 32px; align-items: start; }
+.col h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.card { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--c); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+.card .top { display: flex; justify-content: space-between; gap: 8px; }
+.card .title { font-weight: 600; }
+.card .ago { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.tickets { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0; }
+.chip { background: var(--chip); border-radius: 4px; padding: 1px 6px; font-size: 12px; font-family: ui-monospace, Menlo, monospace; color: var(--ink); text-decoration: none; }
+.chip:hover { text-decoration: underline; }
+.ask { background: color-mix(in srgb, var(--needs) 12%, transparent); border-radius: 6px; padding: 6px 8px; margin: 6px 0; font-size: 13px; }
+.summary { color: var(--muted); font-size: 13px; margin: 6px 0; }
+details { margin-top: 6px; font-size: 13px; }
+details summary { cursor: pointer; color: var(--muted); }
+details pre { white-space: pre-wrap; word-break: break-word; font: 12px/1.45 ui-monospace, Menlo, monospace; background: var(--chip); padding: 8px; border-radius: 6px; max-height: 260px; overflow: auto; }
+.prs { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.pr { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.pr a { color: var(--ink); }
+.badge { font-size: 11px; border-radius: 4px; padding: 0 5px; border: 1px solid var(--line); color: var(--muted); }
+.badge.hot { border-color: var(--needs); color: var(--needs); font-weight: 600; }
+.badge.ok { border-color: var(--done); color: var(--done); }
+.badge.bad { border-color: #e03131; color: #e03131; }
+.foot { display: flex; gap: 10px; margin-top: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.foot a, .foot button { color: var(--muted); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; }
+.empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+@media (max-width: 640px) { header, .filters, .cols { padding-left: 16px; padding-right: 16px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Agent Board</h1>
+  <span class="meta" id="meta">loading…</span>
+</header>
+<div class="filters" id="filters"></div>
+<div class="cols" id="cols"></div>
+<script>
+const COLS = [
+  { key: "your_move", label: "Needs you", color: "#22b8cf" },
+  { key: "working", label: "Running", color: "#e03131" },
+  { key: "reviewing", label: "PR review agents", color: "#4c6ef5" },
+  { key: "in_review", label: "No action", color: "#2b8a3e" },
+  { key: "done", label: "Done", color: "var(--done)" },
+  { key: "ended", label: "Inactive", color: "var(--ended)" },
+];
+let hidden = new Set(JSON.parse(safeGet("hidden") || '["ended"]'));
+function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function safeSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+
+function ago(ts) {
+  if (!ts) return "";
+  const s = (Date.now() - new Date(ts)) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + "m ago";
+  if (s < 86400) return Math.floor(s / 3600) + "h ago";
+  return Math.floor(s / 86400) + "d ago";
+}
+function esc(s) { return (s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function column(s) { return s.status; }
+
+function prRow(p) {
+  const b = [];
+  if (p.state !== "OPEN") b.push(`<span class="badge ${p.state === "MERGED" ? "ok" : ""}">${p.state.toLowerCase()}</span>`);
+  if (p.isDraft) b.push(`<span class="badge">draft</span>`);
+  if (p.state === "OPEN") {
+    if (p.unresolvedThreads) b.push(`<span class="badge hot">${p.unresolvedThreads} unresolved</span>`);
+    if (p.newComments) b.push(`<span class="badge hot">${p.newComments} new comment${p.newComments > 1 ? "s" : ""}</span>`);
+    if (p.reviewDecision === "CHANGES_REQUESTED") b.push(`<span class="badge hot">changes requested</span>`);
+    if (p.reviewDecision === "APPROVED") b.push(`<span class="badge ok">approved</span>`);
+    if (p.checks === "FAILURE" || p.checks === "ERROR") b.push(`<span class="badge bad">checks failing</span>`);
+    if (p.checks === "PENDING") b.push(`<span class="badge">checks running</span>`);
+  }
+  return `<div class="pr"><a href="${p.url}" target="_blank">${esc(p.repo)}#${p.number}</a>${b.join("")}</div>`;
+}
+
+function card(s, color) {
+  const tickets = s.tickets.map(t => `<a class="chip" target="_blank" href="https://linear.app/pheedloop/issue/${t}">${t}</a>`).join("");
+  const why = s.status === "your_move" ? `<div class="ask"><b>${esc(s.reasons.join(" · "))}</b>${s.pendingQuestion ? "<br>" + esc(s.pendingQuestion) : ""}</div>` : "";
+  const summary = s.summary ? `<div class="summary">${esc(s.summary)}</div>` : "";
+  const last = s.lastAssistant ? `<details><summary>Last reply</summary><pre>${esc(s.lastAssistant)}</pre></details>` : "";
+  const prs = s.prs.length ? `<div class="prs">${s.prs.map(prRow).join("")}</div>` : "";
+  const foot = [
+    s.name ? `<span>${esc(s.name)}</span>` : "",
+    s.gitBranch ? `<span>${esc(s.gitBranch)}</span>` : "",
+    s.remoteUrl ? `<a href="${s.remoteUrl}" target="_blank">open</a>` : "",
+    `<button data-copy="${esc(s.resumeCmd)}">copy resume</button>`,
+  ].join("");
+  return `<div class="card" style="--c:${color}">
+    <div class="top"><span class="title">${esc(s.title)}</span><span class="ago">${ago(s.lastActivity)}</span></div>
+    <div class="tickets">${tickets}</div>${why}${summary}${prs}${last}
+    <div class="foot">${foot}</div></div>`;
+}
+
+function render(data) {
+  const groups = Object.fromEntries(COLS.map(c => [c.key, []]));
+  data.sessions.forEach(s => groups[column(s)].push(s));
+  document.getElementById("meta").textContent = `${data.sessions.length} sessions · updated ${new Date(data.generatedAt).toLocaleTimeString()}`;
+  document.getElementById("filters").innerHTML = COLS.map(c =>
+    `<button data-k="${c.key}" class="${hidden.has(c.key) ? "" : "on"}"><span class="dot" style="background:${c.color}"></span> ${c.label}<span class="n">${groups[c.key].length}</span></button>`).join("");
+  document.getElementById("cols").innerHTML = COLS.filter(c => !hidden.has(c.key)).map(c =>
+    `<section class="col"><h2><span class="dot" style="background:${c.color}"></span>${c.label} · ${groups[c.key].length}</h2>
+     ${groups[c.key].map(s => card(s, c.color)).join("") || '<div class="empty">Nothing here.</div>'}</section>`).join("");
+}
+
+let last = null;
+async function load() {
+  try {
+    const r = await fetch("/api/state");
+    last = await r.json();
+    render(last);
+  } catch (e) {
+    document.getElementById("meta").textContent = "server unreachable — is server.py running?";
+  }
+}
+document.addEventListener("click", e => {
+  const f = e.target.closest("[data-k]");
+  if (f) { const k = f.dataset.k; hidden.has(k) ? hidden.delete(k) : hidden.add(k); safeSet("hidden", JSON.stringify([...hidden])); if (last) render(last); }
+  const c = e.target.closest("[data-copy]");
+  if (c) { navigator.clipboard.writeText(c.dataset.copy); c.textContent = "copied"; }
+});
+load();
+setInterval(load, 20000);
+</script>
+</body>
+</html>

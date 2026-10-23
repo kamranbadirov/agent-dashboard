@@ -1,0 +1,503 @@
+#!/usr/bin/env python3
+import glob
+import json
+import os
+import re
+import subprocess
+import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+HOME = Path.home()
+SESSIONS_DIR = HOME / ".claude" / "sessions"
+PROJECTS_DIR = HOME / ".claude" / "projects"
+HERE = Path(__file__).resolve().parent
+PORT = int(os.environ.get("PORT", "7777"))
+ENDED_LOOKBACK_HOURS = int(os.environ.get("ENDED_LOOKBACK_HOURS", "72"))
+STALE_HOURS = int(os.environ.get("STALE_HOURS", "24"))
+PR_CACHE_SECONDS = 90
+TAIL_BYTES = 600_000
+
+TICKET_RE = re.compile(r"\b([A-Z]{2,6}-\d{1,5})\b")
+PR_RE = re.compile(r"github\.com/([\w.-]+)/([\w.-]+)/pull/(\d+)")
+TICKET_DENY_PREFIXES = ("UTF-", "ISO-", "SHA-", "AES-", "HTTP-", "ASD-", "RFC-", "PEP-", "TLS-")
+TICKET_DENYLIST = {"DAT-107"}
+REMINDER_RE = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
+
+_pr_cache = {}
+_pr_lock = threading.Lock()
+
+
+def pid_alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+def find_transcript(session_id):
+    hits = glob.glob(str(PROJECTS_DIR / "*" / f"{session_id}.jsonl"))
+    return Path(hits[0]) if hits else None
+
+
+def read_tail(path):
+    size = path.stat().st_size
+    with open(path, "rb") as f:
+        if size > TAIL_BYTES:
+            f.seek(size - TAIL_BYTES)
+            f.readline()
+        data = f.read()
+    out = []
+    for line in data.splitlines():
+        try:
+            out.append(json.loads(line))
+        except Exception:
+            pass
+    return out
+
+
+def read_head(path, limit=60):
+    out = []
+    with open(path, "rb") as f:
+        for i, line in enumerate(f):
+            if i >= limit:
+                break
+            try:
+                out.append(json.loads(line))
+            except Exception:
+                pass
+    return out
+
+
+def text_of(message):
+    content = (message or {}).get("content")
+    if isinstance(content, str):
+        return content
+    parts = []
+    for block in content or []:
+        if isinstance(block, dict) and block.get("type") == "text":
+            parts.append(block.get("text", ""))
+    return "\n".join(parts)
+
+
+def tickets_in(text):
+    text = REMINDER_RE.sub("", text or "")
+    return [
+        t for t in TICKET_RE.findall(text)
+        if t not in TICKET_DENYLIST and not t.startswith(TICKET_DENY_PREFIXES)
+    ]
+
+
+def parse_transcript(path):
+    head = read_head(path)
+    tail = read_tail(path)
+    info = {
+        "title": None,
+        "summary": None,
+        "lastAssistant": None,
+        "lastUserPrompt": None,
+        "firstPrompt": None,
+        "lastActivity": None,
+        "cwd": None,
+        "gitBranch": None,
+        "pendingTool": None,
+        "tickets": [],
+        "prs": [],
+    }
+
+    for rec in head:
+        if rec.get("type") == "user" and not rec.get("isMeta"):
+            t = text_of(rec.get("message"))
+            if t and not t.startswith("<"):
+                info["firstPrompt"] = t[:300]
+                break
+
+    ticket_counts = {}
+    prs = {}
+    for owner, repo, num in PR_RE.findall(path.read_text(errors="ignore")):
+        prs[f"{owner}/{repo}#{num}"] = (owner, repo, int(num))
+    pending = {}
+    for rec in tail:
+        rtype = rec.get("type")
+        if rtype == "custom-title":
+            info["title"] = rec.get("customTitle")
+            info["_custom"] = True
+        elif rtype == "ai-title" and not info.get("_custom"):
+            info["title"] = rec.get("aiTitle")
+        elif rtype == "system" and rec.get("subtype") == "away_summary":
+            info["summary"] = re.sub(r"\s*\(disable recaps in /config\)\s*$", "", rec.get("content") or "")
+        if rec.get("timestamp") and rtype in ("user", "assistant"):
+            info["lastActivity"] = rec["timestamp"]
+        if rec.get("cwd"):
+            info["cwd"] = rec["cwd"]
+        if rec.get("gitBranch") and rec["gitBranch"] != "HEAD":
+            info["gitBranch"] = rec["gitBranch"]
+
+        msg = rec.get("message") or {}
+        if rtype == "assistant":
+            t = text_of(msg)
+            if t.strip():
+                info["lastAssistant"] = t
+            for block in msg.get("content") or []:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    pending[block.get("id")] = block
+        elif rtype == "user":
+            content = msg.get("content")
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") == "tool_result":
+                        pending.pop(block.get("tool_use_id"), None)
+            if not rec.get("isMeta"):
+                t = text_of(msg)
+                if t and not t.startswith("<"):
+                    info["lastUserPrompt"] = t[:300]
+                    pending.clear()
+
+        for t in tickets_in(text_of(msg) if rtype in ("user", "assistant") else ""):
+            ticket_counts[t] = ticket_counts.get(t, 0) + 1
+
+    if pending:
+        last = list(pending.values())[-1]
+        info["pendingTool"] = last.get("name")
+        if last.get("name") == "AskUserQuestion":
+            qs = (last.get("input") or {}).get("questions") or []
+            if qs:
+                info["pendingQuestion"] = qs[0].get("question")
+
+    priority = []
+    for src in (info["title"], info["gitBranch"], info["firstPrompt"]):
+        for t in tickets_in(src or ""):
+            if t not in priority:
+                priority.append(t)
+    others = sorted(ticket_counts, key=lambda t: -ticket_counts[t])
+    info["tickets"] = (priority + [t for t in others if t not in priority])[:4]
+    info["prs"] = list(prs.values())
+    info.pop("_custom", None)
+    return info
+
+
+def gh_json(args):
+    try:
+        out = subprocess.run(
+            ["gh", *args], capture_output=True, text=True, timeout=25
+        )
+        if out.returncode != 0:
+            return None
+        return json.loads(out.stdout)
+    except Exception:
+        return None
+
+
+PR_QUERY = """
+query($owner:String!,$repo:String!,$num:Int!){
+  repository(owner:$owner,name:$repo){
+    pullRequest(number:$num){
+      number title url state isDraft reviewDecision headRefName updatedAt
+      author{login}
+      comments(last:30){nodes{author{login} createdAt}}
+      reviews(last:30){nodes{author{login} state submittedAt}}
+      reviewThreads(first:100){nodes{isResolved isOutdated comments(first:1){nodes{author{login}}}}}
+      commits(last:1){nodes{commit{committedDate statusCheckRollup{state}}}}
+    }
+  }
+}
+"""
+
+
+def fetch_pr(owner, repo, num):
+    key = f"{owner}/{repo}#{num}"
+    now = time.time()
+    with _pr_lock:
+        cached = _pr_cache.get(key)
+        if cached and now - cached[0] < PR_CACHE_SECONDS:
+            return cached[1]
+    data = gh_json(
+        [
+            "api", "graphql",
+            "-f", f"query={PR_QUERY}",
+            "-F", f"owner={owner}",
+            "-F", f"repo={repo}",
+            "-F", f"num={num}",
+        ]
+    )
+    pr = (((data or {}).get("data") or {}).get("repository") or {}).get("pullRequest")
+    result = None
+    if pr:
+        me = (pr.get("author") or {}).get("login")
+        last_commit = ((pr.get("commits") or {}).get("nodes") or [{}])[-1].get("commit") or {}
+        pushed_at = last_commit.get("committedDate") or ""
+        bots = lambda login: (login or "").endswith("[bot]") or login in ("github-actions", "linear", "linear-code")
+        unresolved = [
+            th for th in (pr.get("reviewThreads") or {}).get("nodes") or []
+            if not th.get("isResolved") and not th.get("isOutdated")
+        ]
+        new_comments = [
+            c for c in (pr.get("comments") or {}).get("nodes") or []
+            if (c.get("author") or {}).get("login") not in (me,) and not bots((c.get("author") or {}).get("login"))
+            and c.get("createdAt", "") > pushed_at
+        ]
+        reviews = [
+            r for r in (pr.get("reviews") or {}).get("nodes") or []
+            if (r.get("author") or {}).get("login") != me and r.get("state") in ("CHANGES_REQUESTED", "COMMENTED", "APPROVED")
+        ]
+        result = {
+            "key": key,
+            "author": me,
+            "repo": repo,
+            "number": pr["number"],
+            "title": pr["title"],
+            "url": pr["url"],
+            "state": pr["state"],
+            "isDraft": pr["isDraft"],
+            "reviewDecision": pr.get("reviewDecision"),
+            "branch": pr.get("headRefName"),
+            "unresolvedThreads": len(unresolved),
+            "newComments": len(new_comments),
+            "reviewers": sorted({(r.get("author") or {}).get("login") for r in reviews}),
+            "checks": (last_commit.get("statusCheckRollup") or {}).get("state"),
+            "updatedAt": pr.get("updatedAt"),
+        }
+    with _pr_lock:
+        _pr_cache[key] = (now, result)
+    return result
+
+
+def my_open_prs():
+    key = "__mine__"
+    now = time.time()
+    with _pr_lock:
+        cached = _pr_cache.get(key)
+        if cached and now - cached[0] < PR_CACHE_SECONDS:
+            return cached[1]
+    data = gh_json(
+        [
+            "search", "prs", "--author=@me", "--owner=pheedloop", "--state=open",
+            "--limit", "60", "--json", "number,title,repository,url",
+        ]
+    ) or []
+    with _pr_lock:
+        _pr_cache[key] = (now, data)
+    return data
+
+
+def live_sessions():
+    out = {}
+    for f in SESSIONS_DIR.glob("*.json"):
+        try:
+            d = json.loads(f.read_text())
+        except Exception:
+            continue
+        if not pid_alive(d.get("pid", -1)):
+            continue
+        out[d["sessionId"]] = d
+    return out
+
+
+def recent_ended(live_ids):
+    cutoff = time.time() - ENDED_LOOKBACK_HOURS * 3600
+    out = []
+    for p in PROJECTS_DIR.glob("*/*.jsonl"):
+        sid = p.stem
+        if sid in live_ids:
+            continue
+        try:
+            if p.stat().st_mtime < cutoff:
+                continue
+        except FileNotFoundError:
+            continue
+        out.append((sid, p))
+    return out
+
+
+_me = None
+
+
+def my_login():
+    global _me
+    if _me is None:
+        try:
+            _me = subprocess.run(
+                ["gh", "api", "user", "-q", ".login"], capture_output=True, text=True, timeout=15
+            ).stdout.strip()
+        except Exception:
+            _me = ""
+    return _me
+
+
+def action_reasons(info, prs, sess_status):
+    reasons = []
+    if info.get("pendingTool") and sess_status != "busy":
+        if info.get("pendingQuestion"):
+            reasons.append("answer question")
+        else:
+            reasons.append(f"approve {info['pendingTool']}")
+    for p in prs:
+        if p["state"] != "OPEN" or p.get("author") != my_login():
+            continue
+        ref = f"{p['repo']}#{p['number']}"
+        talk = p["unresolvedThreads"] + p["newComments"]
+        if talk:
+            reasons.append(f"{talk} comment{'s' if talk > 1 else ''} on {ref}")
+        if p["reviewDecision"] == "CHANGES_REQUESTED":
+            reasons.append(f"changes requested on {ref}")
+        if p["checks"] in ("FAILURE", "ERROR"):
+            reasons.append(f"checks failing on {ref}")
+        if p["reviewDecision"] == "APPROVED" and not p["isDraft"]:
+            reasons.append(f"merge {ref}")
+        if p["isDraft"] and not talk:
+            reasons.append(f"mark {ref} ready")
+    return reasons
+
+
+def is_review_agent(info, prs):
+    mine = [p for p in prs if p.get("author") == my_login()]
+    if mine:
+        return False
+    return bool(prs) or "review" in (info.get("title") or "").lower()
+
+
+def classify(sess_status, alive, info, prs):
+    reasons = action_reasons(info, prs, sess_status)
+    last = info.get("lastActivity")
+    stale = not last or (
+        datetime.now(timezone.utc) - datetime.fromisoformat(last.replace("Z", "+00:00"))
+    ).total_seconds() > STALE_HOURS * 3600
+    if prs and all(p["state"] in ("MERGED", "CLOSED") for p in prs):
+        return "done", reasons
+    if alive and sess_status == "busy":
+        return "working", reasons
+    if reasons:
+        return "your_move", reasons
+    if is_review_agent(info, prs):
+        if not alive or stale:
+            return "ended", reasons
+        return "reviewing", ["review agent idle"]
+    if any(p["state"] == "OPEN" for p in prs):
+        return "in_review", ["waiting on reviewers"]
+    if not alive or stale:
+        return "ended", reasons
+    return "your_move", ["agent finished"]
+
+
+def build_state():
+    live = live_sessions()
+    entries = []
+    for sid, meta in live.items():
+        path = find_transcript(sid)
+        entries.append((sid, path, meta, True))
+    for sid, path in recent_ended(set(live)):
+        entries.append((sid, path, None, False))
+
+    parsed = []
+    for sid, path, meta, alive in entries:
+        if not path or not path.exists():
+            continue
+        try:
+            info = parse_transcript(path)
+        except Exception as e:
+            info = {"title": None, "error": str(e), "tickets": [], "prs": []}
+        if not alive and not info["tickets"] and not info["prs"]:
+            continue
+        if not alive and not info.get("lastActivity"):
+            continue
+        parsed.append((sid, path, meta, alive, info))
+
+    mine = my_open_prs()
+    want = {}
+    for _, _, _, _, info in parsed:
+        for owner, repo, num in info["prs"]:
+            want[f"{owner}/{repo}#{num}"] = (owner, repo, num)
+        for t in info["tickets"]:
+            for pr in mine:
+                if t in (pr.get("title") or ""):
+                    repo = pr["repository"]["nameWithOwner"]
+                    owner, name = repo.split("/")
+                    want[f"{repo}#{pr['number']}"] = (owner, name, pr["number"])
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        fetched = dict(zip(want, pool.map(lambda a: fetch_pr(*a), want.values())))
+
+    sessions = []
+    for sid, path, meta, alive, info in parsed:
+        prs = []
+        keys = [f"{o}/{r}#{n}" for o, r, n in info["prs"]]
+        for t in info["tickets"]:
+            for pr in mine:
+                if t in (pr.get("title") or ""):
+                    keys.append(f"{pr['repository']['nameWithOwner']}#{pr['number']}")
+        for k in dict.fromkeys(keys):
+            if fetched.get(k):
+                prs.append(fetched[k])
+        status, reasons = classify((meta or {}).get("status"), alive, info, prs)
+        sessions.append(
+            {
+                "sessionId": sid,
+                "name": (meta or {}).get("name"),
+                "pid": (meta or {}).get("pid"),
+                "alive": alive,
+                "status": status,
+                "reasons": reasons,
+                "title": info.get("title") or (info.get("firstPrompt") or "")[:80] or sid[:8],
+                "tickets": info["tickets"],
+                "summary": info.get("summary"),
+                "lastAssistant": (info.get("lastAssistant") or "")[-600:],
+                "lastUserPrompt": info.get("lastUserPrompt"),
+                "pendingTool": info.get("pendingTool"),
+                "pendingQuestion": info.get("pendingQuestion"),
+                "lastActivity": info.get("lastActivity"),
+                "cwd": info.get("cwd") or (meta or {}).get("cwd"),
+                "gitBranch": info.get("gitBranch"),
+                "remoteUrl": f"https://claude.ai/code/{meta['bridgeSessionId']}" if meta and meta.get("bridgeSessionId") else None,
+                "resumeCmd": f"claude --resume {sid}",
+                "prs": prs,
+            }
+        )
+    sessions.sort(key=lambda s: s.get("lastActivity") or "", reverse=True)
+    return {"generatedAt": datetime.now(timezone.utc).isoformat(), "sessions": sessions}
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def _send(self, code, body, ctype):
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path.startswith("/api/state"):
+            try:
+                body = json.dumps(build_state()).encode()
+                self._send(200, body, "application/json")
+            except Exception as e:
+                self._send(500, json.dumps({"error": str(e)}).encode(), "application/json")
+        elif self.path in ("/", "/index.html"):
+            self._send(200, (HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
+        else:
+            self._send(404, b"not found", "text/plain")
+
+
+def main():
+    if "--tui" in sys.argv:
+        venv_python = HERE / ".venv" / "bin" / "python"
+        os.execv(str(venv_python), [str(venv_python), str(HERE / "board.py")])
+    if "--json" in sys.argv:
+        print(json.dumps(build_state(), indent=2))
+        return
+    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    print(f"Agent dashboard on http://localhost:{PORT}")
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()
