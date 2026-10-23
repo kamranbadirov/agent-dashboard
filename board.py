@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 
 from rich.text import Text
 from textual import work
@@ -23,6 +24,7 @@ GREEN = "#3fb950"
 GRAY = "#8b949e"
 INK = "#e6edf3"
 MUTED = "#8b949e"
+GITHUB_ICON = "\uf09b"
 
 SECTIONS = [
     ("your_move", "Needs you", AQUA),
@@ -101,10 +103,49 @@ def chips(items, style="on #30363d"):
     return t
 
 
+def nerd_font():
+    forced = os.environ.get("NERD_FONT")
+    if forced in ("0", "1"):
+        return forced == "1"
+    if os.environ.get("TERM_PROGRAM") == "ghostty":
+        return True
+    dirs = [Path.home() / "Library" / "Fonts", Path("/Library/Fonts"),
+            Path.home() / ".local" / "share" / "fonts", Path("/usr/share/fonts")]
+    return any(next(d.glob("**/*[Nn]erd*"), None) for d in dirs if d.is_dir())
+
+
+NERD = nerd_font()
+
+
+def prs_for(s, ticket):
+    t = ticket.lower()
+    return [p for p in s["prs"] if t in (p.get("title") or "").lower() or t in (p.get("branch") or "").lower()]
+
+
+def ticket_line(s):
+    t = Text()
+    links = []
+    for i, ticket in enumerate(s["tickets"][:2]):
+        if i:
+            t.append(" ")
+        prs = prs_for(s, ticket)
+        start = t.cell_len
+        t.append(f" {ticket} ", style=f"{INK} on #30363d")
+        if prs and not NERD:
+            links.append((start, t.cell_len, prs[0]["url"]))
+        if NERD:
+            for p in prs:
+                t.append(" ")
+                links.append((t.cell_len, t.cell_len + 1, p["url"]))
+                t.append(GITHUB_ICON, style=GREEN if p["state"] == "MERGED" else MUTED if p["state"] == "CLOSED" else INK)
+    return t, links
+
+
 class AgentTile(Widget, can_focus=True):
     def __init__(self, session):
         super().__init__(classes=f"tile {session['status']}")
         self.session = session
+        self.links = []
 
     def render(self):
         s = self.session
@@ -123,7 +164,7 @@ class AgentTile(Widget, can_focus=True):
             Text(s.get("pendingQuestion") or refs, style=MUTED),
         ]
         when = ago(s["lastActivity"])
-        bottom = chips(s["tickets"][:2])
+        bottom, self.links = ticket_line(s)
         bottom.append(" " * max(1, width - bottom.cell_len - len(when)))
         bottom.append(when, style=MUTED)
         lines.append(bottom)
@@ -136,6 +177,11 @@ class AgentTile(Widget, can_focus=True):
         if offset and offset.y == 0 and offset.x >= self.size.width - 4:
             self.app.focused_id = self.session["sessionId"]
             self.app.action_close_agent()
+        elif offset and offset.y == 3:
+            for start, end, url in self.links:
+                if start <= offset.x < end:
+                    self.app.open_url(url)
+                    break
 
 
 class SectionHeader(Static):
