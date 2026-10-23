@@ -8,10 +8,11 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, ItemGrid, VerticalScroll
+from textual.screen import ModalScreen
 from textual.widget import Widget
 from textual.widgets import Footer, Static
 
-from server import build_state, notify_new_commits
+from server import build_state, close_session, dismiss_session, notify_new_commits
 
 REFRESH_SECONDS = 20
 
@@ -100,18 +101,26 @@ def chips(items, style="on #30363d"):
     return t
 
 
-class ActionTile(Widget, can_focus=True):
+class AgentTile(Widget, can_focus=True):
     def __init__(self, session):
-        super().__init__(classes="tile")
+        super().__init__(classes=f"tile {session['status']}")
         self.session = session
 
     def render(self):
         s = self.session
+        color = COLOR.get(s["status"], GRAY)
         width = max(10, self.size.width - 2)
+        label = headline(s) if s["status"] == "your_move" else NAME.get(s["status"], s["status"])
+        refs = " ".join(f"#{p['number']}" for p in s["prs"][:3])
+        muted = s["status"] in ("done", "ended")
+        top = Text(label, style=f"bold {color}")
+        top.truncate(width - 3, overflow="ellipsis")
+        top.append(" " * max(1, width - top.cell_len - 1))
+        top.append("✕", style=f"bold {INK}")
         lines = [
-            Text(headline(s), style=f"bold {AQUA}"),
-            Text(s["title"], style=f"bold {INK}"),
-            Text(s.get("pendingQuestion") or "", style=MUTED),
+            top,
+            Text(s["title"], style=f"bold {MUTED if muted else INK}"),
+            Text(s.get("pendingQuestion") or refs, style=MUTED),
         ]
         when = ago(s["lastActivity"])
         bottom = chips(s["tickets"][:2])
@@ -122,44 +131,32 @@ class ActionTile(Widget, can_focus=True):
             line.truncate(width, overflow="ellipsis")
         return Text("\n").join(lines)
 
-
-class AgentRow(Widget, can_focus=True):
-    def __init__(self, session):
-        super().__init__(classes=f"row {session['status']}")
-        self.session = session
-
-    def render(self):
-        s = self.session
-        width = self.size.width - 2
-        color = COLOR.get(s["status"], GRAY)
-        right = Text()
-        tickets = chips(s["tickets"][:2])
-        tickets.truncate(24, overflow="ellipsis")
-        right.append_text(tickets)
-        right.append(" " * (25 - tickets.cell_len))
-        refs = " ".join(f"#{p['number']}" for p in s["prs"][:2])
-        right.append(f"{refs:<12}", style=color)
-        right.append(f"{ago(s['lastActivity']):>9}", style=MUTED)
-        room = max(8, width - right.cell_len - 3)
-        title = s["title"] if len(s["title"]) <= room else s["title"][: room - 1] + "…"
-        t = Text()
-        t.append("● ", style=color)
-        t.append(title, style=INK if s["status"] not in ("done", "ended") else MUTED)
-        t.append(" " * max(1, width - 2 - len(title) - right.cell_len))
-        t.append_text(right)
-        return t
+    def on_click(self, event):
+        offset = event.get_content_offset(self)
+        if offset and offset.y == 0 and offset.x >= self.size.width - 4:
+            self.app.focused_id = self.session["sessionId"]
+            self.app.action_close_agent()
 
 
 class SectionHeader(Static):
     pass
 
 
+class CloseButton(Static):
+    def on_click(self):
+        self.app.action_close_agent()
+
+
 class Preview(VerticalScroll):
     def compose(self):
+        yield CloseButton("✕ Close agent", id="close-btn")
         yield Static(id="preview-body")
 
     def show(self, s):
         body = self.query_one("#preview-body", Static)
+        btn = self.query_one("#close-btn")
+        btn.display = bool(s)
+        btn.update("✕ Close agent" if s and s["alive"] else "✕ Remove")
         if not s:
             body.update(Text("Nothing selected.", style=MUTED))
             return
@@ -205,6 +202,37 @@ class Preview(VerticalScroll):
         self.scroll_home(animate=False)
 
 
+class ConfirmClose(ModalScreen):
+    BINDINGS = [
+        Binding("y,enter", "confirm", "Close"),
+        Binding("n,escape", "cancel", "Cancel"),
+    ]
+    DEFAULT_CSS = f"""
+    ConfirmClose {{ align: center middle; }}
+    #dialog {{ width: 60; height: auto; padding: 1 2; background: #161b22; border: tall {RED}; }}
+    """
+
+    def __init__(self, title):
+        super().__init__()
+        self.agent_title = title
+
+    def compose(self):
+        t = Text()
+        t.append("Close this agent?\n\n", style=f"bold {INK}")
+        t.append(self.agent_title + "\n\n", style=MUTED)
+        t.append("y", style=f"bold {RED}")
+        t.append(" close   ", style=MUTED)
+        t.append("n", style=f"bold {INK}")
+        t.append(" cancel", style=MUTED)
+        yield Static(t, id="dialog")
+
+    def action_confirm(self):
+        self.dismiss(True)
+
+    def action_cancel(self):
+        self.dismiss(False)
+
+
 class Board(App):
     TITLE = "Agents"
     CSS = f"""
@@ -213,21 +241,23 @@ class Board(App):
     #main {{ height: 1fr; }}
     #list {{ width: 3fr; padding: 0 1 0 2; scrollbar-size-vertical: 1; }}
     #preview {{ width: 2fr; min-width: 40; background: #161b22; padding: 1 2; border-left: tall #21262d; }}
+    #close-btn {{ width: auto; padding: 0 2; margin: 0 0 1 0; color: {INK}; background: {RED} 35%; }}
+    #close-btn:hover {{ background: {RED}; }}
     SectionHeader {{ margin: 1 0 0 0; height: 2; padding: 0 1; }}
     ItemGrid {{ grid-gutter: 1 2; height: auto; margin: 0 0 0 0; }}
-    .tile {{
-        text-wrap: nowrap;
-        height: 6; padding: 0 1;
-        background: {AQUA} 10%;
-        border: tall {AQUA} 35%;
-    }}
-    .tile:focus {{ background: {AQUA} 22%; border: tall {AQUA}; }}
-    .row {{ text-wrap: nowrap; height: 1; padding: 0 1; margin: 0 0 0 0; }}
-    .row:hover {{ background: #161b22; }}
-    .row.working:focus {{ background: {RED} 22%; }}
-    .row.reviewing:focus {{ background: {BLUE} 22%; }}
-    .row.in_review:focus {{ background: {GREEN} 22%; }}
-    .row.done:focus, .row.ended:focus, .row.your_move:focus {{ background: #30363d; }}
+    .tile {{ text-wrap: nowrap; height: 6; padding: 0 1; }}
+    .tile.your_move {{ background: {AQUA} 10%; border: tall {AQUA} 35%; }}
+    .tile.your_move:focus {{ background: {AQUA} 22%; border: tall {AQUA}; }}
+    .tile.working {{ background: {RED} 10%; border: tall {RED} 35%; }}
+    .tile.working:focus {{ background: {RED} 22%; border: tall {RED}; }}
+    .tile.reviewing {{ background: {BLUE} 10%; border: tall {BLUE} 35%; }}
+    .tile.reviewing:focus {{ background: {BLUE} 22%; border: tall {BLUE}; }}
+    .tile.in_review {{ background: {GREEN} 10%; border: tall {GREEN} 35%; }}
+    .tile.in_review:focus {{ background: {GREEN} 22%; border: tall {GREEN}; }}
+    .tile.done {{ background: {GRAY} 10%; border: tall {GRAY} 35%; }}
+    .tile.done:focus {{ background: {GRAY} 22%; border: tall {GRAY}; }}
+    .tile.ended {{ background: {GRAY} 10%; border: tall {GRAY} 35%; }}
+    .tile.ended:focus {{ background: {GRAY} 22%; border: tall {GRAY}; }}
     #empty {{ color: {MUTED}; padding: 1 1; }}
     Footer {{ background: #0d1117; }}
     """
@@ -236,9 +266,10 @@ class Board(App):
         Binding("down,j,right,l", "move(1)", "Move", show=False),
         Binding("up,k,left,h", "move(-1)", "Move", show=False),
         Binding("enter", "resume", "Resume"),
-        Binding("o", "open_session", "Open on claude.ai"),
-        Binding("p", "open_pr", "Open PR"),
-        Binding("t", "open_ticket", "Open ticket"),
+        Binding("o", "open_session", "Open"),
+        Binding("p", "open_pr", "PR"),
+        Binding("t", "open_ticket", "Ticket"),
+        Binding("x", "close_agent", "Close"),
         Binding("e", "toggle_inactive", "Inactive"),
         Binding("r", "refresh", "Refresh"),
         Binding("q", "quit", "Quit"),
@@ -325,17 +356,14 @@ class Board(App):
             header.append(name, style=f"bold {color}")
             header.append(f"  {len(items)}", style=MUTED)
             widgets.append(SectionHeader(header))
-            if key == "your_move":
-                widgets.append(ItemGrid(*[ActionTile(s) for s in items], min_column_width=38))
-            else:
-                widgets.extend(AgentRow(s) for s in items)
+            widgets.append(ItemGrid(*[AgentTile(s) for s in items], min_column_width=38))
         if not widgets:
             widgets.append(Static("No agents right now. Start one, and it shows up here.", id="empty"))
         lst.mount_all(widgets)
         self.call_after_refresh(self.restore_focus)
 
     def cards(self):
-        return [w for w in self.query("ActionTile, AgentRow")]
+        return [w for w in self.query("AgentTile")]
 
     def restore_focus(self):
         cards = self.cards()
@@ -354,7 +382,10 @@ class Board(App):
 
     def selected(self):
         w = self.focused
-        return w.session if w is not None and hasattr(w, "session") else None
+        if w is not None and hasattr(w, "session"):
+            return w.session
+        sessions = (self.state or {}).get("sessions", [])
+        return next((s for s in sessions if s["sessionId"] == self.focused_id), None)
 
     def action_move(self, step):
         cards = self.cards()
@@ -397,6 +428,33 @@ class Board(App):
             self.open_url(f"https://linear.app/pheedloop/issue/{s['tickets'][0]}")
         elif s:
             self.notify("This session has no ticket.")
+
+    def action_close_agent(self):
+        s = self.selected()
+        if not s:
+            return
+        if not s["alive"]:
+            self.dismiss_worker(s["sessionId"])
+            return
+
+        def done(confirmed):
+            if confirmed:
+                self.close_worker(s["sessionId"])
+
+        self.push_screen(ConfirmClose(s["title"]), done)
+
+    @work(thread=True)
+    def close_worker(self, session_id):
+        ok, message = close_session(session_id)
+        self.call_from_thread(self.notify, message, severity="information" if ok else "error")
+        self.call_from_thread(self.load)
+
+    @work(thread=True)
+    def dismiss_worker(self, session_id):
+        ok, message = dismiss_session(session_id)
+        if not ok:
+            self.call_from_thread(self.notify, message, severity="error")
+        self.call_from_thread(self.load)
 
     def action_resume(self):
         s = self.selected()

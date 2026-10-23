@@ -5,6 +5,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -21,6 +22,8 @@ HERE = Path(__file__).resolve().parent
 PORT = int(os.environ.get("PORT", "7777"))
 ENDED_LOOKBACK_HOURS = int(os.environ.get("ENDED_LOOKBACK_HOURS", "72"))
 STALE_HOURS = int(os.environ.get("STALE_HOURS", "24"))
+AUTO_CLOSE_MERGED = os.environ.get("AUTO_CLOSE_MERGED", "1") != "0"
+DISMISSED_FILE = HERE / "dismissed.json"
 PR_CACHE_SECONDS = 90
 WATCH_SECONDS = int(os.environ.get("WATCH_SECONDS", "60"))
 NOTIFIED_FILE = HOME / ".claude" / "agent-dashboard-notified.json"
@@ -442,6 +445,48 @@ def classify(sess_status, alive, info, prs):
     return "your_move", ["agent finished"]
 
 
+def close_session(session_id):
+    meta = live_sessions().get(session_id)
+    if not meta:
+        return False, "That agent is not running."
+    pid = meta["pid"]
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return True, "Already closed."
+    except PermissionError:
+        return False, "Not allowed to close that process."
+    for _ in range(20):
+        if not pid_alive(pid):
+            return True, "Closed."
+        time.sleep(0.1)
+    return True, "Close requested; the agent is still shutting down."
+
+
+def auto_close_merged(sessions):
+    for s in sessions:
+        if s["alive"] and not s["busy"] and s["status"] == "done":
+            ok, _ = close_session(s["sessionId"])
+            if ok:
+                s["alive"] = False
+
+
+def load_dismissed():
+    try:
+        return json.loads(DISMISSED_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def dismiss_session(session_id):
+    if session_id in live_sessions():
+        return False, "Close the agent before removing it."
+    dismissed = load_dismissed()
+    dismissed[session_id] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    DISMISSED_FILE.write_text(json.dumps(dismissed))
+    return True, "Removed."
+
+
 def build_state():
     live = live_sessions()
     entries = []
@@ -507,6 +552,7 @@ def build_state():
                 "name": (meta or {}).get("name"),
                 "pid": (meta or {}).get("pid"),
                 "alive": alive,
+                "busy": (meta or {}).get("status") == "busy",
                 "status": status,
                 "reasons": reasons,
                 "title": info.get("title") or (info.get("firstPrompt") or "")[:80] or sid[:8],
@@ -553,6 +599,13 @@ def build_state():
                 "prs": [p],
             }
         )
+    if AUTO_CLOSE_MERGED:
+        auto_close_merged(sessions)
+    dismissed = load_dismissed()
+    sessions = [
+        s for s in sessions
+        if s["alive"] or (s.get("lastActivity") or "") > dismissed.get(s["sessionId"], "")
+    ]
     sessions.sort(key=lambda s: s.get("lastActivity") or "", reverse=True)
     return {"generatedAt": datetime.now(timezone.utc).isoformat(), "sessions": sessions}
 
@@ -629,6 +682,24 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, (HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
         else:
             self._send(404, b"not found", "text/plain")
+
+    def do_POST(self):
+        host = self.headers.get("Host", "").split(":")[0]
+        json_body = self.headers.get("Content-Type", "").startswith("application/json")
+        actions = {"/api/close": close_session, "/api/dismiss": dismiss_session}
+        if self.path not in actions:
+            self._send(404, b"not found", "text/plain")
+        elif host not in ("localhost", "127.0.0.1") or not json_body:
+            self._send(403, b"forbidden", "text/plain")
+        else:
+            try:
+                size = int(self.headers.get("Content-Length", 0))
+                session_id = json.loads(self.rfile.read(size)).get("sessionId", "")
+            except Exception:
+                self._send(400, json.dumps({"ok": False, "message": "Bad request."}).encode(), "application/json")
+                return
+            ok, message = actions[self.path](session_id)
+            self._send(200 if ok else 409, json.dumps({"ok": ok, "message": message}).encode(), "application/json")
 
 
 def main():
