@@ -102,6 +102,23 @@ def tickets_in(text):
     ]
 
 
+def conversation_prs(path):
+    prs = {}
+    with open(path, "rb") as f:
+        for line in f:
+            if b"/pull/" not in line:
+                continue
+            try:
+                rec = json.loads(line)
+            except Exception:
+                continue
+            if rec.get("type") not in ("user", "assistant") or rec.get("isMeta"):
+                continue
+            for owner, repo, num in PR_RE.findall(REMINDER_RE.sub("", text_of(rec.get("message")))):
+                prs[f"{owner}/{repo}#{num}"] = (owner, repo, int(num))
+    return prs
+
+
 def parse_transcript(path):
     head = read_head(path)
     tail = read_tail(path)
@@ -126,10 +143,7 @@ def parse_transcript(path):
                 info["firstPrompt"] = t[:300]
                 break
 
-    ticket_counts = {}
-    prs = {}
-    for owner, repo, num in PR_RE.findall(path.read_text(errors="ignore")):
-        prs[f"{owner}/{repo}#{num}"] = (owner, repo, int(num))
+    prs = conversation_prs(path)
     pending = {}
     for rec in tail:
         rtype = rec.get("type")
@@ -167,9 +181,6 @@ def parse_transcript(path):
                     info["lastUserPrompt"] = t[:300]
                     pending.clear()
 
-        for t in tickets_in(text_of(msg) if rtype in ("user", "assistant") else ""):
-            ticket_counts[t] = ticket_counts.get(t, 0) + 1
-
     if pending:
         last = list(pending.values())[-1]
         info["pendingTool"] = last.get("name")
@@ -183,8 +194,7 @@ def parse_transcript(path):
         for t in tickets_in(src or ""):
             if t not in priority:
                 priority.append(t)
-    others = sorted(ticket_counts, key=lambda t: -ticket_counts[t])
-    info["tickets"] = (priority + [t for t in others if t not in priority])[:4]
+    info["tickets"] = priority[:4]
     info["prs"] = list(prs.values())
     info.pop("_custom", None)
     return info
