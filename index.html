@@ -90,6 +90,7 @@ function prRow(p) {
   if (p.state !== "OPEN") b.push(`<span class="badge ${p.state === "MERGED" ? "ok" : ""}">${p.state.toLowerCase()}</span>`);
   if (p.isDraft) b.push(`<span class="badge">draft</span>`);
   if (p.state === "OPEN") {
+    if (p.commitsSinceReview) b.push(`<a class="badge hot" target="_blank" href="${p.sinceReviewUrl || p.url}">${p.commitsSinceReview} new commit${p.commitsSinceReview > 1 ? "s" : ""} since your review</a>`);
     if (p.unresolvedThreads) b.push(`<span class="badge hot">${p.unresolvedThreads} unresolved</span>`);
     if (p.newComments) b.push(`<span class="badge hot">${p.newComments} new comment${p.newComments > 1 ? "s" : ""}</span>`);
     if (p.reviewDecision === "CHANGES_REQUESTED") b.push(`<span class="badge hot">changes requested</span>`);
@@ -110,7 +111,7 @@ function card(s, color) {
     s.name ? `<span>${esc(s.name)}</span>` : "",
     s.gitBranch ? `<span>${esc(s.gitBranch)}</span>` : "",
     s.remoteUrl ? `<a href="${s.remoteUrl}" target="_blank">open</a>` : "",
-    `<button data-copy="${esc(s.resumeCmd)}">copy resume</button>`,
+    s.resumeCmd ? `<button data-copy="${esc(s.resumeCmd)}">copy resume</button>` : "",
   ].join("");
   return `<div class="card" style="--c:${color}">
     <div class="top"><span class="title">${esc(s.title)}</span><span class="ago">${ago(s.lastActivity)}</span></div>
