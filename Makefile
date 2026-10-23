@@ -1,6 +1,7 @@
 .PHONY: setup shell tui web
 
 setup:
+	brew bundle --file=Brewfile
 	python3 -m venv .venv
 	.venv/bin/pip install textual
 
