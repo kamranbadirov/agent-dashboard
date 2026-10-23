@@ -11,7 +11,7 @@ from textual.containers import Horizontal, ItemGrid, VerticalScroll
 from textual.widget import Widget
 from textual.widgets import Footer, Static
 
-from server import build_state
+from server import build_state, notify_new_commits
 
 REFRESH_SECONDS = 20
 
@@ -71,6 +71,9 @@ def pr_badges(p):
     if p["isDraft"]:
         out.append(("draft", GRAY))
     if p["state"] == "OPEN":
+        if p.get("commitsSinceReview"):
+            n = p["commitsSinceReview"]
+            out.append((f"{n} new commit{'s' if n > 1 else ''} since your review", AQUA))
         if p["unresolvedThreads"]:
             out.append((f"{p['unresolvedThreads']} unresolved", AQUA))
         if p["newComments"]:
@@ -265,6 +268,7 @@ class Board(App):
     def load(self):
         try:
             state = build_state()
+            notify_new_commits(state)
         except Exception as e:
             self.call_from_thread(self.notify, str(e), severity="error")
             return
@@ -383,7 +387,7 @@ class Board(App):
     def action_open_pr(self):
         s = self.selected()
         if s and s["prs"]:
-            self.open_url(s["prs"][0]["url"])
+            self.open_url(s["prs"][0].get("sinceReviewUrl") or s["prs"][0]["url"])
         elif s:
             self.notify("This session has no PR.")
 
@@ -397,6 +401,9 @@ class Board(App):
     def action_resume(self):
         s = self.selected()
         if not s:
+            return
+        if not s.get("resumeCmd"):
+            self.action_open_pr()
             return
         if s["alive"]:
             self.notify(f"{s.get('name') or 'This agent'} is still running. Press o to open it.")

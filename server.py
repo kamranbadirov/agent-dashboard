@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+import fcntl
 import glob
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -20,6 +22,8 @@ PORT = int(os.environ.get("PORT", "7777"))
 ENDED_LOOKBACK_HOURS = int(os.environ.get("ENDED_LOOKBACK_HOURS", "72"))
 STALE_HOURS = int(os.environ.get("STALE_HOURS", "24"))
 PR_CACHE_SECONDS = 90
+WATCH_SECONDS = int(os.environ.get("WATCH_SECONDS", "60"))
+NOTIFIED_FILE = HOME / ".claude" / "agent-dashboard-notified.json"
 TAIL_BYTES = 600_000
 
 TICKET_RE = re.compile(r"\b([A-Z]{2,6}-\d{1,5})\b")
@@ -202,21 +206,44 @@ query($owner:String!,$repo:String!,$num:Int!){
       number title url state isDraft reviewDecision headRefName updatedAt
       author{login}
       comments(last:30){nodes{author{login} createdAt}}
-      reviews(last:30){nodes{author{login} state submittedAt}}
+      reviews(last:30){nodes{author{login} state submittedAt commit{oid}}}
       reviewThreads(first:100){nodes{isResolved isOutdated comments(first:1){nodes{author{login}}}}}
-      commits(last:1){nodes{commit{committedDate statusCheckRollup{state}}}}
+      commits(last:1){nodes{commit{oid committedDate statusCheckRollup{state}}}}
+      history: commits(last:50){nodes{commit{oid committedDate author{user{login}}}}}
     }
   }
 }
 """
 
 
-def fetch_pr(owner, repo, num):
+def commits_since_review(pr, author, viewer):
+    mine = [
+        r for r in (pr.get("reviews") or {}).get("nodes") or []
+        if (r.get("author") or {}).get("login") == viewer
+        and r.get("state") in ("CHANGES_REQUESTED", "COMMENTED", "APPROVED")
+        and r.get("commit")
+    ]
+    if not mine:
+        return None, []
+    last_review = max(mine, key=lambda r: r.get("submittedAt") or "")
+    base = last_review["commit"]["oid"]
+    history = [n.get("commit") or {} for n in (pr.get("history") or {}).get("nodes") or []]
+    oids = [c.get("oid") for c in history]
+    if base in oids:
+        newer = history[oids.index(base) + 1:]
+    else:
+        newer = [c for c in history if (c.get("committedDate") or "") > (last_review.get("submittedAt") or "")]
+    if author != viewer:
+        newer = [c for c in newer if ((c.get("author") or {}).get("user") or {}).get("login") != viewer]
+    return base, newer
+
+
+def fetch_pr(owner, repo, num, stamp=None):
     key = f"{owner}/{repo}#{num}"
     now = time.time()
     with _pr_lock:
         cached = _pr_cache.get(key)
-        if cached and now - cached[0] < PR_CACHE_SECONDS:
+        if cached and (now - cached[0] < PR_CACHE_SECONDS or (stamp and cached[2] == stamp)):
             return cached[1]
     data = gh_json(
         [
@@ -247,6 +274,8 @@ def fetch_pr(owner, repo, num):
             r for r in (pr.get("reviews") or {}).get("nodes") or []
             if (r.get("author") or {}).get("login") != me and r.get("state") in ("CHANGES_REQUESTED", "COMMENTED", "APPROVED")
         ]
+        base, newer = commits_since_review(pr, me, my_login())
+        head = last_commit.get("oid")
         result = {
             "key": key,
             "author": me,
@@ -263,9 +292,12 @@ def fetch_pr(owner, repo, num):
             "reviewers": sorted({(r.get("author") or {}).get("login") for r in reviews}),
             "checks": (last_commit.get("statusCheckRollup") or {}).get("state"),
             "updatedAt": pr.get("updatedAt"),
+            "headOid": head,
+            "commitsSinceReview": len(newer),
+            "sinceReviewUrl": f"{pr['url']}/files/{base}..{head}" if newer and base and head else None,
         }
     with _pr_lock:
-        _pr_cache[key] = (now, result)
+        _pr_cache[key] = (now, result, stamp)
     return result
 
 
@@ -283,7 +315,26 @@ def my_open_prs():
         ]
     ) or []
     with _pr_lock:
-        _pr_cache[key] = (now, data)
+        _pr_cache[key] = (now, data, None)
+    return data
+
+
+def reviewed_prs():
+    key = "__reviewed__"
+    now = time.time()
+    with _pr_lock:
+        cached = _pr_cache.get(key)
+        if cached and now - cached[0] < PR_CACHE_SECONDS:
+            return cached[1]
+    data = gh_json(
+        [
+            "search", "prs", "--reviewed-by=@me", "--owner=pheedloop", "--state=open",
+            "--limit", "40", "--json", "number,title,repository,url,author,updatedAt",
+        ]
+    ) or []
+    data = [pr for pr in data if (pr.get("author") or {}).get("login") != my_login()]
+    with _pr_lock:
+        _pr_cache[key] = (now, data, None)
     return data
 
 
@@ -339,9 +390,14 @@ def action_reasons(info, prs, sess_status):
         else:
             reasons.append(f"approve {info['pendingTool']}")
     for p in prs:
-        if p["state"] != "OPEN" or p.get("author") != my_login():
+        if p["state"] != "OPEN":
             continue
         ref = f"{p['repo']}#{p['number']}"
+        if p.get("author") != my_login():
+            n = p.get("commitsSinceReview")
+            if n:
+                reasons.append(f"{n} new commit{'s' if n > 1 else ''} on {ref} since your review")
+            continue
         talk = p["unresolvedThreads"] + p["newComments"]
         if talk:
             reasons.append(f"{talk} comment{'s' if talk > 1 else ''} on {ref}")
@@ -421,8 +477,17 @@ def build_state():
                     owner, name = repo.split("/")
                     want[f"{repo}#{pr['number']}"] = (owner, name, pr["number"])
 
+    reviewed = reviewed_prs()
+    stamps = {}
+    for pr in reviewed:
+        repo = pr["repository"]["nameWithOwner"]
+        owner, name = repo.split("/")
+        k = f"{repo}#{pr['number']}"
+        want.setdefault(k, (owner, name, pr["number"]))
+        stamps[k] = pr.get("updatedAt")
+
     with ThreadPoolExecutor(max_workers=8) as pool:
-        fetched = dict(zip(want, pool.map(lambda a: fetch_pr(*a), want.values())))
+        fetched = dict(zip(want, pool.map(lambda k: fetch_pr(*want[k], stamp=stamps.get(k)), want)))
 
     sessions = []
     for sid, path, meta, alive, info in parsed:
@@ -459,8 +524,87 @@ def build_state():
                 "prs": prs,
             }
         )
+    linked = {p["key"] for s in sessions for p in s["prs"]}
+    for pr in reviewed:
+        k = f"{pr['repository']['nameWithOwner']}#{pr['number']}"
+        p = fetched.get(k)
+        if k in linked or not p or not p.get("commitsSinceReview"):
+            continue
+        sessions.append(
+            {
+                "sessionId": f"pr:{k}",
+                "name": None,
+                "pid": None,
+                "alive": False,
+                "status": "your_move",
+                "reasons": action_reasons({}, [p], None),
+                "title": p["title"],
+                "tickets": tickets_in(p["title"])[:2],
+                "summary": None,
+                "lastAssistant": None,
+                "lastUserPrompt": None,
+                "pendingTool": None,
+                "pendingQuestion": None,
+                "lastActivity": p.get("updatedAt"),
+                "cwd": None,
+                "gitBranch": p.get("branch"),
+                "remoteUrl": None,
+                "resumeCmd": None,
+                "prs": [p],
+            }
+        )
     sessions.sort(key=lambda s: s.get("lastActivity") or "", reverse=True)
     return {"generatedAt": datetime.now(timezone.utc).isoformat(), "sessions": sessions}
+
+
+def send_notification(title, message, url, group):
+    if shutil.which("terminal-notifier"):
+        subprocess.run(
+            ["terminal-notifier", "-title", title, "-message", message, "-open", url,
+             "-group", group, "-sound", "default"],
+            capture_output=True, timeout=10,
+        )
+    else:
+        script = f"display notification {json.dumps(message)} with title {json.dumps(title)} sound name \"default\""
+        subprocess.run(["osascript", "-e", script], capture_output=True, timeout=10)
+
+
+def notify_new_commits(state):
+    due = {}
+    for s in state["sessions"]:
+        for p in s["prs"]:
+            if p["state"] == "OPEN" and p.get("author") != my_login() and p.get("commitsSinceReview"):
+                due[f"{p['key']}@{p['headOid']}"] = p
+    NOTIFIED_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(NOTIFIED_FILE, "a+") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.seek(0)
+        raw = f.read()
+        try:
+            seen = set(json.loads(raw)) if raw else None
+        except Exception:
+            seen = set()
+        fresh = [] if seen is None else [p for k, p in due.items() if k not in seen]
+        f.seek(0)
+        f.truncate()
+        json.dump(sorted((seen or set()) | set(due)), f)
+    for p in fresh:
+        n = p["commitsSinceReview"]
+        send_notification(
+            f"{p['repo']}#{p['number']}: {n} new commit{'s' if n > 1 else ''}",
+            f"{p['author']} pushed since your review. {p['title']}",
+            p.get("sinceReviewUrl") or p["url"],
+            p["key"],
+        )
+
+
+def watch():
+    while True:
+        try:
+            notify_new_commits(build_state())
+        except Exception as e:
+            print(f"watch failed: {e}", file=sys.stderr)
+        time.sleep(WATCH_SECONDS)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -494,6 +638,7 @@ def main():
     if "--json" in sys.argv:
         print(json.dumps(build_state(), indent=2))
         return
+    threading.Thread(target=watch, daemon=True).start()
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     print(f"Agent dashboard on http://localhost:{PORT}")
     server.serve_forever()
