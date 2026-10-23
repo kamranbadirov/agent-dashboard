@@ -73,11 +73,27 @@ python3 server.py --tui
 | `o` | Open the session on claude.ai |
 | `p` | Open the first PR |
 | `t` | Open the first Linear ticket |
+| `x` | Close the selected agent, or remove an ended one |
 | `e` | Show or hide inactive agents |
 | `r` | Refresh now |
 | `q` | Quit |
 
 The board refreshes every 20 seconds.
+You can also click the `✕` on a card, or the button in the preview pane.
+
+### Closing and removing agents
+
+Every card has a `✕` button. What it does depends on the agent:
+
+- **Running agent:** the dashboard asks you to confirm, then stops the agent with `SIGTERM`.
+- **Ended or done agent:** the dashboard removes the card at once. It does not stop anything.
+
+The dashboard saves removed sessions in `dismissed.json`.
+A removed session comes back only if it has new activity.
+
+The dashboard also closes agents by itself when all their PRs are merged or closed and the agent is idle.
+Agents that are busy are never closed this way.
+To turn this off, set `AUTO_CLOSE_MERGED=0`.
 
 ### Raw JSON
 
@@ -96,6 +112,7 @@ Set these environment variables to change the defaults:
 | `PORT` | `7777` | The port for the web board. |
 | `ENDED_LOOKBACK_HOURS` | `72` | How far back to look for ended sessions. |
 | `STALE_HOURS` | `24` | Hours without activity before an agent becomes inactive. |
+| `AUTO_CLOSE_MERGED` | `1` | Set to `0` to stop the dashboard from closing idle agents whose PRs are all merged or closed. |
 
 Example:
 
@@ -106,5 +123,6 @@ PORT=8080 STALE_HOURS=12 python3 server.py
 ## Notes
 
 - The server listens only on `127.0.0.1`. Other machines cannot reach it.
+- The close and remove actions (`POST /api/close` and `/api/dismiss`) accept only requests to `localhost` or `127.0.0.1` with a JSON body.
 - The dashboard caches PR data for 90 seconds to limit GitHub API calls.
 - The PR search and ticket links point to the `pheedloop` GitHub org and Linear workspace. Change them in `server.py` and `board.py` for your own org.
