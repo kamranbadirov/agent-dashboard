@@ -4,6 +4,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from rich.cells import cell_len
 from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
@@ -25,6 +26,14 @@ GRAY = "#8b949e"
 INK = "#e6edf3"
 MUTED = "#8b949e"
 GITHUB_ICON = "\uf09b"
+REPO_ICONS = {
+    "pikachu": "⚡",
+    "raichu": "🐭",
+    "charmander": "🔥",
+    "ditto": "🟣",
+    "porygon": "🔷",
+    "rotom": "🔌",
+}
 
 SECTIONS = [
     ("your_move", "Needs you", AQUA),
@@ -131,13 +140,16 @@ def ticket_line(s):
         prs = prs_for(s, ticket)
         start = t.cell_len
         t.append(f" {ticket} ", style=f"{INK} on #30363d")
-        if prs and not NERD:
+        if prs and not NERD and not any(REPO_ICONS.get(p["repo"].lower()) for p in prs):
             links.append((start, t.cell_len, prs[0]["url"]))
-        if NERD:
-            for p in prs:
-                t.append(" ")
-                links.append((t.cell_len, t.cell_len + 1, p["url"]))
-                t.append(GITHUB_ICON, style=GREEN if p["state"] == "MERGED" else MUTED if p["state"] == "CLOSED" else INK)
+        for p in prs:
+            icon = REPO_ICONS.get(p["repo"].lower()) or (GITHUB_ICON if NERD else None)
+            if not icon:
+                continue
+            t.append(" ")
+            links.append((t.cell_len, t.cell_len + cell_len(icon), p["url"]))
+            dim = p["state"] in ("MERGED", "CLOSED") and icon == GITHUB_ICON
+            t.append(icon, style=GREEN if dim and p["state"] == "MERGED" else MUTED if dim else INK)
     return t, links
 
 
@@ -150,34 +162,35 @@ class AgentTile(Widget, can_focus=True):
     def render(self):
         s = self.session
         color = COLOR.get(s["status"], GRAY)
-        width = max(10, self.size.width - 2)
+        width = max(10, self.size.width - 4)
         label = headline(s) if s["status"] == "your_move" else NAME.get(s["status"], s["status"])
         refs = " ".join(f"#{p['number']}" for p in s["prs"][:3])
         muted = s["status"] in ("done", "ended")
-        top = Text(label, style=f"bold {color}")
-        top.truncate(width - 5, overflow="ellipsis")
-        top.append(" " * max(1, width - top.cell_len - 3))
-        top.append("✎", style=f"bold {MUTED}")
-        top.append(" ")
-        top.append("✕", style=f"bold {INK}")
-        lines = [
-            top,
-            Text(s["title"], style=f"bold {MUTED if muted else INK}"),
-            Text(s.get("pendingQuestion") or refs, style=MUTED),
-        ]
         when = ago(s["lastActivity"])
-        bottom, self.links = ticket_line(s)
-        bottom.append(" " * max(1, width - bottom.cell_len - len(when)))
-        bottom.append(when, style=MUTED)
-        lines.append(bottom)
-        for line in lines:
-            line.truncate(width, overflow="ellipsis")
+        title = Text(s["title"], style=f"bold {MUTED if muted else INK}")
+        title.truncate(max(1, width - len(when) - 1), overflow="ellipsis")
+        title.append(" " * max(1, width - title.cell_len - len(when)))
+        title.append(when, style=MUTED)
+        status = Text(label, style=f"bold {color}")
+        bottom, links = ticket_line(s)
+        self.links = [(a + 2, b + 2, url) for a, b, url in links]
+        bottom.truncate(max(1, width - 4), overflow="ellipsis")
+        bottom.append(" " * max(1, width - bottom.cell_len - 3))
+        bottom.append("✎", style=f"bold {MUTED}")
+        bottom.append(" ")
+        bottom.append("✕", style=f"bold {INK}")
+        lines = []
+        for body in (title, status, Text(s.get("pendingQuestion") or refs, style=MUTED), bottom):
+            body.truncate(width, overflow="ellipsis")
+            line = Text("▌ ", style=color)
+            line.append_text(body)
+            lines.append(line)
         return Text("\n").join(lines)
 
     def on_click(self, event):
         offset = event.get_content_offset(self)
         edge = self.size.width - 4
-        if offset and offset.y == 0 and offset.x >= edge - 2:
+        if offset and offset.y == 3 and offset.x >= edge - 2:
             self.app.focused_id = self.session["sessionId"]
             if offset.x >= edge:
                 self.app.action_close_agent()

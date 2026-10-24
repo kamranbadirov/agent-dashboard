@@ -41,6 +41,7 @@ h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
 .gh:hover { color: var(--ink); }
 .gh.merged { color: var(--done); }
 .gh.closed { color: var(--ended); }
+.gh .sprite { width: 24px; height: 24px; image-rendering: pixelated; margin: -5px 0; }
 .gh svg { width: 14px; height: 14px; fill: currentColor; }
 .ask { background: color-mix(in srgb, var(--needs) 12%, transparent); border-radius: 6px; padding: 6px 8px; margin: 6px 0; font-size: 13px; }
 .summary { color: var(--muted); font-size: 13px; margin: 6px 0; }
@@ -57,8 +58,10 @@ details pre { white-space: pre-wrap; word-break: break-word; font: 12px/1.45 ui-
 .foot { display: flex; gap: 10px; margin-top: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
 .foot a, .foot button { color: var(--muted); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; }
 .card .close { background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit; padding: 0 2px; line-height: 1; }
-.card .edit { background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit; padding: 0 2px; line-height: 1; opacity: 0; }
-.card:hover .edit, .card .edit:focus { opacity: 1; }
+.bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bottom .tickets { margin: 6px 0; }
+.actions { display: flex; gap: 6px; }
+.card .edit { background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit; padding: 0 2px; line-height: 1; }
 .card .edit:hover { color: var(--ink); }
 .card .close:hover { color: #e03131; }
 .empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
@@ -117,9 +120,15 @@ function prsFor(s, t) {
   const id = t.toLowerCase();
   return s.prs.filter(p => (p.title || "").toLowerCase().includes(id) || (p.branch || "").toLowerCase().includes(id));
 }
+const SPRITE_IDS = { pikachu: 25, raichu: 26, charmander: 4, ditto: 132, porygon: 137, rotom: 479 };
+function repoIcon(p) {
+  const id = SPRITE_IDS[(p.repo || "").toLowerCase()];
+  if (!id) return GH_ICON;
+  return `<img class="sprite" alt="" loading="lazy" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png" onerror="this.replaceWith(Object.assign(document.createElement('span'),{innerHTML:GH_ICON.trim()}).firstChild)">`;
+}
 function ghLink(p) {
   const label = `${p.repo}#${p.number} · ${p.state.toLowerCase()}`;
-  return `<a class="gh ${p.state.toLowerCase()}" target="_blank" href="${p.url}" title="${esc(label)}" aria-label="${esc(label)}">${GH_ICON}</a>`;
+  return `<a class="gh ${p.state.toLowerCase()}" target="_blank" href="${p.url}" title="${esc(label)}" aria-label="${esc(label)}">${repoIcon(p)}</a>`;
 }
 
 function card(s, color) {
@@ -134,9 +143,11 @@ function card(s, color) {
     s.remoteUrl ? `<a href="${s.remoteUrl}" target="_blank">open</a>` : "",
     s.resumeCmd ? `<button data-copy="${esc(s.resumeCmd)}">copy resume</button>` : "",
   ].join("");
+  const label = s.alive ? "Close agent" : "Remove card";
   return `<div class="card" style="--c:${color}">
-    <div class="top"><span class="title">${esc(s.title)}</span><span class="ago">${ago(s.lastActivity)}</span><button class="edit" title="Rename" aria-label="Rename" data-rename="${esc(s.sessionId)}" data-title="${esc(s.title)}" data-custom="${s.customTitle ? "1" : ""}">✎</button><button class="close" title="${s.alive ? "Close agent" : "Remove card"}" aria-label="${s.alive ? "Close agent" : "Remove card"}" data-close="${esc(s.sessionId)}" data-alive="${s.alive}" data-title="${esc(s.title)}">✕</button></div>
-    <div class="tickets">${tickets}</div>${why}${summary}${prs}${last}
+    <div class="top"><span class="title">${esc(s.title)}</span><span class="ago">${ago(s.lastActivity)}</span></div>
+    ${why}${summary}${prs}${last}
+    <div class="bottom"><div class="tickets">${tickets}</div><div class="actions"><button class="edit" title="Rename" aria-label="Rename" data-rename="${esc(s.sessionId)}" data-title="${esc(s.title)}" data-custom="${s.customTitle ? "1" : ""}">✎</button><button class="close" title="${label}" aria-label="${label}" data-close="${esc(s.sessionId)}" data-alive="${s.alive}" data-title="${esc(s.title)}">✕</button></div></div>
     <div class="foot">${foot}</div></div>`;
 }
 
