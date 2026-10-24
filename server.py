@@ -713,6 +713,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, body, "application/json")
             except Exception as e:
                 self._send(500, json.dumps({"error": str(e)}).encode(), "application/json")
+        elif self.path.startswith("/assets/"):
+            f = (HERE / "assets" / Path(self.path[len("/assets/"):].split("?")[0]).name)
+            ctype = {".png": "image/png", ".svg": "image/svg+xml"}.get(f.suffix)
+            if ctype and f.is_file():
+                self._send(200, f.read_bytes(), ctype)
+            else:
+                self._send(404, b"not found", "text/plain")
         elif self.path in ("/", "/index.html"):
             self._send(200, (HERE / "index.html").read_bytes(), "text/html; charset=utf-8")
         else:

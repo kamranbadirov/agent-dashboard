@@ -41,7 +41,7 @@ h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
 .gh:hover { color: var(--ink); }
 .gh.merged { color: var(--done); }
 .gh.closed { color: var(--ended); }
-.gh .sprite { width: 24px; height: 24px; image-rendering: pixelated; margin: -5px 0; }
+.gh .sprite { width: 20px; height: 20px; object-fit: cover; border-radius: 4px; margin: -3px 0; }
 .gh svg { width: 14px; height: 14px; fill: currentColor; }
 .ask { background: color-mix(in srgb, var(--needs) 12%, transparent); border-radius: 6px; padding: 6px 8px; margin: 6px 0; font-size: 13px; }
 .summary { color: var(--muted); font-size: 13px; margin: 6px 0; }
@@ -120,11 +120,11 @@ function prsFor(s, t) {
   const id = t.toLowerCase();
   return s.prs.filter(p => (p.title || "").toLowerCase().includes(id) || (p.branch || "").toLowerCase().includes(id));
 }
-const SPRITE_IDS = { pikachu: 25, raichu: 26, charmander: 4, ditto: 132, porygon: 137, rotom: 479 };
+const REPO_IMAGES = { pikachu: "pikachu.png", raichu: "raichu.png", charmander: "charmander.png", ditto: "ditto.svg", porygon: "porygon.png", rotom: "rotom.png" };
 function repoIcon(p) {
-  const id = SPRITE_IDS[(p.repo || "").toLowerCase()];
-  if (!id) return GH_ICON;
-  return `<img class="sprite" alt="" loading="lazy" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png" onerror="this.replaceWith(Object.assign(document.createElement('span'),{innerHTML:GH_ICON.trim()}).firstChild)">`;
+  const file = REPO_IMAGES[(p.repo || "").toLowerCase()];
+  if (!file) return GH_ICON;
+  return `<img class="sprite" alt="" loading="lazy" src="/assets/${file}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{innerHTML:GH_ICON.trim()}).firstChild)">`;
 }
 function ghLink(p) {
   const label = `${p.repo}#${p.number} · ${p.state.toLowerCase()}`;
