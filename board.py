@@ -155,8 +155,10 @@ class AgentTile(Widget, can_focus=True):
         refs = " ".join(f"#{p['number']}" for p in s["prs"][:3])
         muted = s["status"] in ("done", "ended")
         top = Text(label, style=f"bold {color}")
-        top.truncate(width - 3, overflow="ellipsis")
-        top.append(" " * max(1, width - top.cell_len - 1))
+        top.truncate(width - 5, overflow="ellipsis")
+        top.append(" " * max(1, width - top.cell_len - 3))
+        top.append("✎", style=f"bold {MUTED}")
+        top.append(" ")
         top.append("✕", style=f"bold {INK}")
         lines = [
             top,
@@ -174,9 +176,13 @@ class AgentTile(Widget, can_focus=True):
 
     def on_click(self, event):
         offset = event.get_content_offset(self)
-        if offset and offset.y == 0 and offset.x >= self.size.width - 4:
+        edge = self.size.width - 4
+        if offset and offset.y == 0 and offset.x >= edge - 2:
             self.app.focused_id = self.session["sessionId"]
-            self.app.action_close_agent()
+            if offset.x >= edge:
+                self.app.action_close_agent()
+            else:
+                self.app.action_rename_agent()
         elif offset and offset.y == 3:
             for start, end, url in self.links:
                 if start <= offset.x < end:
