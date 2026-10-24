@@ -120,9 +120,29 @@ Example:
 PORT=8080 STALE_HOURS=12 python3 server.py
 ```
 
+## Project layout
+
+```
+server.py              entry point (web board, --tui, --json)
+agentboard/
+  core/                no UI and no HTTP; both boards use it
+    config.py          paths, env vars, constants
+    transcript.py      read a Claude Code session transcript
+    github.py          gh CLI calls and the PR cache
+    sessions.py        live and ended sessions, close an agent
+    classify.py        decide which group an agent belongs to
+    store.py           dismissed.json and titles.json
+    state.py           build_state(), the one function the boards call
+    notify.py          desktop notifications for new commits
+  web/                 HTTP server and static/ (page and repo images)
+  tui/                 terminal board: app, theme, icons, format, widgets/, screens
+```
+
+Imports only point down: `web` and `tui` use `core`, never the other way round.
+
 ## Notes
 
 - The server listens only on `127.0.0.1`. Other machines cannot reach it.
 - The close and remove actions (`POST /api/close` and `/api/dismiss`) accept only requests to `localhost` or `127.0.0.1` with a JSON body.
 - The dashboard caches PR data for 90 seconds to limit GitHub API calls.
-- The PR search and ticket links point to the `pheedloop` GitHub org and Linear workspace. Change them in `server.py` and `board.py` for your own org.
+- The PR search and ticket links point to the `pheedloop` GitHub org and Linear workspace. Change them in `agentboard/core/github.py` and `agentboard/tui/app.py` (and `agentboard/web/static/index.html`) for your own org.
