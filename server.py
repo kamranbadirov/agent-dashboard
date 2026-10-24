@@ -24,6 +24,7 @@ ENDED_LOOKBACK_HOURS = int(os.environ.get("ENDED_LOOKBACK_HOURS", "72"))
 STALE_HOURS = int(os.environ.get("STALE_HOURS", "24"))
 AUTO_CLOSE_MERGED = os.environ.get("AUTO_CLOSE_MERGED", "1") != "0"
 DISMISSED_FILE = HERE / "dismissed.json"
+TITLES_FILE = HERE / "titles.json"
 PR_CACHE_SECONDS = 90
 WATCH_SECONDS = int(os.environ.get("WATCH_SECONDS", "60"))
 NOTIFIED_FILE = HOME / ".claude" / "agent-dashboard-notified.json"
@@ -497,6 +498,24 @@ def dismiss_session(session_id):
     return True, "Removed."
 
 
+def load_titles():
+    try:
+        return json.loads(TITLES_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def rename_session(session_id, title):
+    title = " ".join((title or "").split())[:120]
+    titles = load_titles()
+    if title:
+        titles[session_id] = title
+    else:
+        titles.pop(session_id, None)
+    TITLES_FILE.write_text(json.dumps(titles))
+    return True, "Renamed." if title else "Title reset."
+
+
 def build_state():
     live = live_sessions()
     entries = []
@@ -580,6 +599,7 @@ def build_state():
                 "prs": prs,
             }
         )
+    titles = load_titles()
     linked = {p["key"] for s in sessions for p in s["prs"]}
     for pr in reviewed:
         k = f"{pr['repository']['nameWithOwner']}#{pr['number']}"
@@ -609,6 +629,11 @@ def build_state():
                 "prs": [p],
             }
         )
+    for s in sessions:
+        s["autoTitle"] = s["title"]
+        s["customTitle"] = titles.get(s["sessionId"])
+        if s["customTitle"]:
+            s["title"] = s["customTitle"]
     if AUTO_CLOSE_MERGED:
         auto_close_merged(sessions)
     dismissed = load_dismissed()
@@ -696,7 +721,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         host = self.headers.get("Host", "").split(":")[0]
         json_body = self.headers.get("Content-Type", "").startswith("application/json")
-        actions = {"/api/close": close_session, "/api/dismiss": dismiss_session}
+        actions = {
+            "/api/close": lambda body: close_session(body.get("sessionId", "")),
+            "/api/dismiss": lambda body: dismiss_session(body.get("sessionId", "")),
+            "/api/rename": lambda body: rename_session(body.get("sessionId", ""), body.get("title", "")),
+        }
         if self.path not in actions:
             self._send(404, b"not found", "text/plain")
         elif host not in ("localhost", "127.0.0.1") or not json_body:
@@ -704,11 +733,11 @@ class Handler(BaseHTTPRequestHandler):
         else:
             try:
                 size = int(self.headers.get("Content-Length", 0))
-                session_id = json.loads(self.rfile.read(size)).get("sessionId", "")
+                body = json.loads(self.rfile.read(size))
             except Exception:
                 self._send(400, json.dumps({"ok": False, "message": "Bad request."}).encode(), "application/json")
                 return
-            ok, message = actions[self.path](session_id)
+            ok, message = actions[self.path](body)
             self._send(200 if ok else 409, json.dumps({"ok": ok, "message": message}).encode(), "application/json")
 
 

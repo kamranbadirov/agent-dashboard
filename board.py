@@ -8,12 +8,12 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, ItemGrid, VerticalScroll
+from textual.containers import Horizontal, ItemGrid, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widget import Widget
-from textual.widgets import Footer, Static
+from textual.widgets import Footer, Input, Static
 
-from server import build_state, close_session, dismiss_session, notify_new_commits
+from server import build_state, close_session, dismiss_session, notify_new_commits, rename_session
 
 REFRESH_SECONDS = 20
 
@@ -279,6 +279,32 @@ class ConfirmClose(ModalScreen):
         self.dismiss(False)
 
 
+class RenameTitle(ModalScreen):
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+    DEFAULT_CSS = f"""
+    RenameTitle {{ align: center middle; }}
+    #rename-dialog {{ width: 70; height: auto; padding: 1 2; background: #161b22; border: tall {AQUA}; }}
+    #rename-dialog Static {{ margin: 0 0 1 0; }}
+    """
+
+    def __init__(self, title, custom):
+        super().__init__()
+        self.current = title
+        self.custom = custom
+
+    def compose(self):
+        hint = "Enter to save, empty to reset, esc to cancel" if self.custom else "Enter to save, esc to cancel"
+        with Vertical(id="rename-dialog"):
+            yield Static(Text("Rename card\n" + hint, style=MUTED))
+            yield Input(value=self.current, select_on_focus=True)
+
+    def on_input_submitted(self, event):
+        self.dismiss(event.value)
+
+    def action_cancel(self):
+        self.dismiss(None)
+
+
 class Board(App):
     TITLE = "Agents"
     CSS = f"""
@@ -315,6 +341,7 @@ class Board(App):
         Binding("o", "open_session", "Open"),
         Binding("p", "open_pr", "PR"),
         Binding("t", "open_ticket", "Ticket"),
+        Binding("n", "rename_agent", "Rename"),
         Binding("x", "close_agent", "Close"),
         Binding("e", "toggle_inactive", "Inactive"),
         Binding("r", "refresh", "Refresh"),
@@ -488,6 +515,22 @@ class Board(App):
                 self.close_worker(s["sessionId"])
 
         self.push_screen(ConfirmClose(s["title"]), done)
+
+    def action_rename_agent(self):
+        s = self.selected()
+        if not s:
+            return
+
+        def done(title):
+            if title is not None:
+                self.rename_worker(s["sessionId"], title)
+
+        self.push_screen(RenameTitle(s["title"], bool(s.get("customTitle"))), done)
+
+    @work(thread=True)
+    def rename_worker(self, session_id, title):
+        rename_session(session_id, title)
+        self.call_from_thread(self.load)
 
     @work(thread=True)
     def close_worker(self, session_id):

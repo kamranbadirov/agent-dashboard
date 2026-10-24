@@ -57,6 +57,9 @@ details pre { white-space: pre-wrap; word-break: break-word; font: 12px/1.45 ui-
 .foot { display: flex; gap: 10px; margin-top: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
 .foot a, .foot button { color: var(--muted); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; }
 .card .close { background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit; padding: 0 2px; line-height: 1; }
+.card .edit { background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit; padding: 0 2px; line-height: 1; opacity: 0; }
+.card:hover .edit, .card .edit:focus { opacity: 1; }
+.card .edit:hover { color: var(--ink); }
 .card .close:hover { color: #e03131; }
 .empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
 @media (max-width: 640px) { header, .filters, .cols { padding-left: 16px; padding-right: 16px; } }
@@ -132,7 +135,7 @@ function card(s, color) {
     s.resumeCmd ? `<button data-copy="${esc(s.resumeCmd)}">copy resume</button>` : "",
   ].join("");
   return `<div class="card" style="--c:${color}">
-    <div class="top"><span class="title">${esc(s.title)}</span><span class="ago">${ago(s.lastActivity)}</span><button class="close" title="${s.alive ? "Close agent" : "Remove card"}" aria-label="${s.alive ? "Close agent" : "Remove card"}" data-close="${esc(s.sessionId)}" data-alive="${s.alive}" data-title="${esc(s.title)}">✕</button></div>
+    <div class="top"><span class="title">${esc(s.title)}</span><span class="ago">${ago(s.lastActivity)}</span><button class="edit" title="Rename" aria-label="Rename" data-rename="${esc(s.sessionId)}" data-title="${esc(s.title)}" data-custom="${s.customTitle ? "1" : ""}">✎</button><button class="close" title="${s.alive ? "Close agent" : "Remove card"}" aria-label="${s.alive ? "Close agent" : "Remove card"}" data-close="${esc(s.sessionId)}" data-alive="${s.alive}" data-title="${esc(s.title)}">✕</button></div>
     <div class="tickets">${tickets}</div>${why}${summary}${prs}${last}
     <div class="foot">${foot}</div></div>`;
 }
@@ -163,9 +166,26 @@ document.addEventListener("click", e => {
   if (f) { const k = f.dataset.k; hidden.has(k) ? hidden.delete(k) : hidden.add(k); safeSet("hidden", JSON.stringify([...hidden])); if (last) render(last); }
   const c = e.target.closest("[data-copy]");
   if (c) { navigator.clipboard.writeText(c.dataset.copy); c.textContent = "copied"; }
+  const n = e.target.closest("[data-rename]");
+  if (n) renameAgent(n);
   const x = e.target.closest("[data-close]");
   if (x) closeAgent(x);
 });
+
+async function renameAgent(btn) {
+  const title = prompt(btn.dataset.custom ? "Card title (leave empty to reset)" : "Card title", btn.dataset.title);
+  if (title === null) return;
+  try {
+    await fetch("/api/rename", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: btn.dataset.rename, title }),
+    });
+  } catch (e) {
+    return;
+  }
+  load();
+}
 
 async function closeAgent(btn) {
   const alive = btn.dataset.alive === "true";
