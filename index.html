@@ -120,11 +120,13 @@ function prsFor(s, t) {
   const id = t.toLowerCase();
   return s.prs.filter(p => (p.title || "").toLowerCase().includes(id) || (p.branch || "").toLowerCase().includes(id));
 }
-const REPO_IMAGES = { pikachu: "pikachu.png", raichu: "raichu.png", charmander: "charmander.png", ditto: "ditto.svg", porygon: "porygon.png", rotom: "rotom.png" };
+// Same artwork each repo's deploy workflow uses as its SLACK_ICON.
+const CHARMANDER_IMG = "https://archives.bulbagarden.net/media/upload/thumb/7/73/004Charmander.png/250px-004Charmander.png";
+const REPO_IMAGES = { pikachu: "/assets/pikachu.png", raichu: "/assets/raichu.png", charmander: CHARMANDER_IMG, ditto: "/assets/ditto.png", porygon: "/assets/porygon.png", rotom: "/assets/rotom.png" };
 function repoIcon(p) {
-  const file = REPO_IMAGES[(p.repo || "").toLowerCase()];
-  if (!file) return GH_ICON;
-  return `<img class="sprite" alt="" loading="lazy" src="/assets/${file}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{innerHTML:GH_ICON.trim()}).firstChild)">`;
+  const src = REPO_IMAGES[(p.repo || "").toLowerCase()];
+  if (!src) return GH_ICON;
+  return `<img class="sprite" alt="" loading="lazy" referrerpolicy="no-referrer" src="${src}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{innerHTML:GH_ICON.trim()}).firstChild)">`;
 }
 function ghLink(p) {
   const label = `${p.repo}#${p.number} · ${p.state.toLowerCase()}`;
