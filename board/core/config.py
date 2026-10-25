@@ -6,6 +6,7 @@ HOME = Path.home()
 SESSIONS_DIR = HOME / ".claude" / "sessions"
 PROJECTS_DIR = HOME / ".claude" / "projects"
 ROOT = Path(__file__).resolve().parents[2]
+ASSETS_DIR = ROOT / "board" / "assets"
 PORT = int(os.environ.get("PORT", "7777"))
 ENDED_LOOKBACK_HOURS = int(os.environ.get("ENDED_LOOKBACK_HOURS", "72"))
 STALE_HOURS = int(os.environ.get("STALE_HOURS", "24"))

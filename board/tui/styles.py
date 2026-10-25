@@ -23,6 +23,7 @@ ItemGrid {{ grid-gutter: 1 2; height: auto; margin: 0 0 0 0; }}
 .tile.done:focus {{ background: {GRAY} 22%; border: tall {GRAY}; }}
 .tile.ended {{ background: {GRAY} 10%; border: tall {GRAY} 35%; }}
 .tile.ended:focus {{ background: {GRAY} 22%; border: tall {GRAY}; }}
+RepoImage {{ position: absolute; }}
 #empty {{ color: {MUTED}; padding: 1 1; }}
 Footer {{ background: #0d1117; }}
 """

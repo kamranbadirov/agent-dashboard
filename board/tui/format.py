@@ -1,9 +1,8 @@
 from datetime import datetime, timezone
 
-from rich.cells import cell_len
 from rich.text import Text
 
-from .icons import GITHUB_ICON, NERD, REPO_ICONS
+from .icons import GITHUB_ICON, NERD, repo_image
 from .theme import AQUA, GRAY, GREEN, INK, MUTED, RED
 
 
@@ -86,14 +85,12 @@ def ticket_line(s):
         prs = prs_for(s, ticket)
         start = t.cell_len
         t.append(f" {ticket} ", style=f"{INK} on #30363d")
-        if prs and not NERD and not any(REPO_ICONS.get(p["repo"].lower()) for p in prs):
-            links.append((start, t.cell_len, prs[0]["url"]))
-        for p in prs:
-            icon = REPO_ICONS.get(p["repo"].lower()) or (GITHUB_ICON if NERD else None)
-            if not icon:
-                continue
+        plain = [p for p in prs if not repo_image(p["repo"])]
+        if plain and not NERD:
+            links.append((start, t.cell_len, plain[0]["url"]))
+        for p in plain if NERD else []:
             t.append(" ")
-            links.append((t.cell_len, t.cell_len + cell_len(icon), p["url"]))
-            dim = p["state"] in ("MERGED", "CLOSED") and icon == GITHUB_ICON
-            t.append(icon, style=GREEN if dim and p["state"] == "MERGED" else MUTED if dim else INK)
+            links.append((t.cell_len, t.cell_len + 1, p["url"]))
+            dim = p["state"] in ("MERGED", "CLOSED")
+            t.append(GITHUB_ICON, style=GREEN if p["state"] == "MERGED" else MUTED if dim else INK)
     return t, links

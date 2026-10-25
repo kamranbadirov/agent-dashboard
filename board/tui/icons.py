@@ -1,15 +1,18 @@
 import os
 from pathlib import Path
 
+from ..core.config import ASSETS_DIR
+
 GITHUB_ICON = "\uf09b"
-REPO_ICONS = {
-    "pikachu": "⚡",
-    "raichu": "🐭",
-    "charmander": "🔥",
-    "ditto": "🟣",
-    "porygon": "🔷",
-    "rotom": "🔌",
+REPO_IMAGES = {
+    repo: ASSETS_DIR / f"{repo}.png"
+    for repo in ("pikachu", "raichu", "charmander", "ditto", "porygon", "rotom")
 }
+
+
+def repo_image(repo):
+    path = REPO_IMAGES.get((repo or "").lower())
+    return path if path and path.is_file() else None
 
 
 def nerd_font():

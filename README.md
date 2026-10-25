@@ -33,7 +33,7 @@ You can use the dashboard in two ways:
 
 ## Requirements
 
-- Python 3.12
+- Python 3.10 or newer (the terminal board uses `textual-image`)
 - [Claude Code](https://claude.com/claude-code)
 - [GitHub CLI](https://cli.github.com/), logged in with `gh auth login`
 - macOS (the terminal board uses `open` to open links)
@@ -43,8 +43,8 @@ You can use the dashboard in two ways:
 ```bash
 git clone https://github.com/kamranbadirov/agent-dashboard.git
 cd agent-dashboard
-python3 -m venv .venv
-.venv/bin/pip install textual
+python3.11 -m venv .venv
+.venv/bin/pip install textual textual-image
 ```
 
 The web board uses only the Python standard library.
@@ -134,7 +134,8 @@ board/
     store.py           dismissed.json and titles.json
     state.py           build_state(), the one function the boards call
     notify.py          desktop notifications for new commits
-  web/                 HTTP server and static/ (page and repo images)
+  web/                 HTTP server and static/ (the page)
+  assets/              repo images, shared by both boards
   tui/                 terminal board: app, theme, icons, format, widgets/, screens
 ```
 

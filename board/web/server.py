@@ -10,6 +10,7 @@ from ..core.state import build_state
 from ..core.store import dismiss_session, rename_session
 
 STATIC = Path(__file__).resolve().parent / "static"
+ASSETS = Path(__file__).resolve().parents[1] / "assets"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -31,7 +32,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send(500, json.dumps({"error": str(e)}).encode(), "application/json")
         elif self.path.startswith("/assets/"):
-            f = (STATIC / "assets" / Path(self.path[len("/assets/"):].split("?")[0]).name)
+            f = (ASSETS / Path(self.path[len("/assets/"):].split("?")[0]).name)
             ctype = {".png": "image/png", ".svg": "image/svg+xml"}.get(f.suffix)
             if ctype and f.is_file():
                 self._send(200, f.read_bytes(), ctype)

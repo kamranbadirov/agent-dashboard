@@ -2,7 +2,11 @@ from rich.text import Text
 from textual.widget import Widget
 
 from ..format import ago, headline, ticket_line
+from ..icons import repo_image
 from ..theme import COLOR, GRAY, INK, MUTED, NAME
+from .repo_image import HEIGHT, WIDTH, RepoImage
+
+MAX_IMAGES = 2
 
 
 class AgentTile(Widget, can_focus=True):
@@ -10,6 +14,32 @@ class AgentTile(Widget, can_focus=True):
         super().__init__(classes=f"tile {session['status']}")
         self.session = session
         self.links = []
+        self.badges = self.repo_badges()
+
+    def repo_badges(self):
+        seen = {}
+        for p in self.session["prs"]:
+            path = repo_image(p["repo"])
+            if path and p["repo"].lower() not in seen:
+                seen[p["repo"].lower()] = (path, p)
+        return list(seen.values())[:MAX_IMAGES]
+
+    def compose(self):
+        for path, pr in self.badges:
+            yield RepoImage(path, pr)
+
+    def on_mount(self):
+        self.layout_images()
+
+    def on_resize(self):
+        self.layout_images()
+
+    def layout_images(self):
+        images = list(self.query(RepoImage))
+        for i, img in enumerate(images):
+            img.styles.offset = (self.size.width - 2 - (WIDTH + 1) * (len(images) - i), 1)
+            img.styles.width = WIDTH
+            img.styles.height = HEIGHT
 
     def render(self):
         s = self.session
@@ -32,8 +62,9 @@ class AgentTile(Widget, can_focus=True):
         bottom.append(" ")
         bottom.append("✕", style=f"bold {INK}")
         lines = []
-        for body in (title, status, Text(s.get("pendingQuestion") or refs, style=MUTED), bottom):
-            body.truncate(width, overflow="ellipsis")
+        reserve = (WIDTH + 1) * len(self.badges)
+        for row, body in enumerate((title, status, Text(s.get("pendingQuestion") or refs, style=MUTED), bottom)):
+            body.truncate(width - reserve if row in (1, 2) else width, overflow="ellipsis")
             line = Text("▌ ", style=color)
             line.append_text(body)
             lines.append(line)
