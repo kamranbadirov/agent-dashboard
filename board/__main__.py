@@ -9,7 +9,7 @@ def main():
     if "--tui" in sys.argv:
         venv_python = ROOT / ".venv" / "bin" / "python"
         os.environ["PYTHONPATH"] = str(ROOT)
-        os.execv(str(venv_python), [str(venv_python), "-m", "agentboard.tui.app"])
+        os.execv(str(venv_python), [str(venv_python), "-m", "board.tui.app"])
     if "--json" in sys.argv:
         import json
 
