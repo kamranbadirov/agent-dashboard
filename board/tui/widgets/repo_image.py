@@ -3,8 +3,8 @@ from textual_image.widget import BaseImage
 
 from ..circle import circle
 
-WIDTH = 4
-HEIGHT = 2
+WIDTH = 2
+HEIGHT = 1
 
 
 class RepoImage(BaseImage, Renderable=AutoRenderable):

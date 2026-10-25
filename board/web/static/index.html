@@ -29,11 +29,11 @@ h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
 .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; padding: 0 24px 32px; align-items: start; }
 .col h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; color: var(--muted); }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.card { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--c); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+.card { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--c); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
 .card .top { display: flex; justify-content: space-between; gap: 8px; }
 .card .title { font-weight: 600; }
 .card .ago { color: var(--muted); font-size: 12px; white-space: nowrap; }
-.tickets { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.tickets { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .chip { background: var(--chip); border-radius: 4px; padding: 1px 6px; font-size: 12px; font-family: ui-monospace, Menlo, monospace; color: var(--ink); text-decoration: none; }
 .chip:hover { text-decoration: underline; }
 .ticket { display: inline-flex; align-items: center; gap: 3px; }
@@ -45,10 +45,10 @@ h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
 .gh:hover .sprite { border-color: var(--ink); }
 .gh .plain { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; background: var(--chip); align-items: center; justify-content: center; }
 .gh svg { width: 14px; height: 14px; fill: currentColor; }
-.status { color: var(--c); font-weight: 600; font-size: 13px; margin-top: 2px; }
-.ask { background: color-mix(in srgb, var(--needs) 12%, transparent); border-radius: 6px; padding: 6px 8px; margin: 6px 0; font-size: 13px; }
-.summary { color: var(--muted); font-size: 13px; margin: 6px 0; }
-details { margin-top: 6px; font-size: 13px; }
+.status { color: var(--c); font-weight: 600; font-size: 13px; }
+.ask { background: color-mix(in srgb, var(--needs) 12%, transparent); border-radius: 6px; padding: 6px 8px; font-size: 13px; }
+.summary { color: var(--muted); font-size: 13px; }
+details { font-size: 13px; }
 details summary { cursor: pointer; color: var(--muted); }
 details pre { white-space: pre-wrap; word-break: break-word; font: 12px/1.45 ui-monospace, Menlo, monospace; background: var(--chip); padding: 8px; border-radius: 6px; max-height: 260px; overflow: auto; }
 .prs { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
@@ -58,11 +58,10 @@ details pre { white-space: pre-wrap; word-break: break-word; font: 12px/1.45 ui-
 .badge.hot { border-color: var(--needs); color: var(--needs); font-weight: 600; }
 .badge.ok { border-color: var(--done); color: var(--done); }
 .badge.bad { border-color: #e03131; color: #e03131; }
-.foot { display: flex; gap: 10px; margin-top: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.foot { display: flex; gap: 10px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
 .foot a, .foot button { color: var(--muted); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; }
 .card .close { background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit; padding: 0 2px; line-height: 1; }
 .bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.bottom .tickets { margin: 6px 0; }
 .actions { display: flex; gap: 6px; }
 .card .edit { background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit; padding: 0 2px; line-height: 1; }
 .card .edit:hover { color: var(--ink); }
