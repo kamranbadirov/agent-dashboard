@@ -10,7 +10,7 @@ Screen {{ background: #0d1117; }}
 #close-btn:hover {{ background: {RED}; }}
 SectionHeader {{ margin: 1 0 0 0; height: 2; padding: 0 1; }}
 ItemGrid {{ grid-gutter: 1 2; height: auto; margin: 0 0 0 0; }}
-.tile {{ text-wrap: nowrap; height: 7; min-height: 7; padding: 0 1; }}
+.tile {{ text-wrap: nowrap; height: 6; min-height: 6; padding: 0 1; }}
 .tile.your_move {{ background: {AQUA} 10%; border: tall {AQUA} 35%; }}
 .tile.your_move:focus {{ background: {AQUA} 22%; border: tall {AQUA}; }}
 .tile.working {{ background: {RED} 10%; border: tall {RED} 35%; }}

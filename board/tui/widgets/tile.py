@@ -8,7 +8,7 @@ from .repo_image import HEIGHT, WIDTH, RepoImage
 
 MAX_IMAGES = 3
 GAP = 1
-BOTTOM_ROW = 4
+BOTTOM_ROW = 3
 
 
 class AgentTile(Widget, can_focus=True):
@@ -71,7 +71,7 @@ class AgentTile(Widget, can_focus=True):
         bottom.append(" ")
         bottom.append("✕", style=f"bold {INK}")
         lines = []
-        for body in (title, Text(), status, ask, bottom):
+        for body in (title, status, ask, bottom):
             body.truncate(width, overflow="ellipsis")
             line = Text("▌ ", style=color)
             line.append_text(body)
