@@ -1,9 +1,11 @@
 .PHONY: setup shell tui web
 
+PYTHON ?= python3.11
+
 setup:
 	brew bundle --file=Brewfile
-	python3 -m venv .venv
-	.venv/bin/pip install textual
+	$(PYTHON) -m venv .venv
+	.venv/bin/pip install -r requirements.txt
 
 shell:
 	@if [ -f .venv/bin/activate ]; then . .venv/bin/activate; fi; exec "$${SHELL:-/bin/sh}"

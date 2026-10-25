@@ -1,6 +1,6 @@
 # Agent Dashboard
 
-![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)
 ![Textual](https://img.shields.io/badge/TUI-Textual-5A4FCF)
 ![Claude Code](https://img.shields.io/badge/for-Claude%20Code-D97757?logo=anthropic&logoColor=white)
 ![GitHub CLI](https://img.shields.io/badge/needs-gh%20CLI-181717?logo=github)
@@ -33,7 +33,7 @@ You can use the dashboard in two ways:
 
 ## Requirements
 
-- Python 3.12
+- Python 3.10 or newer (the terminal board uses `textual-image`)
 - [Claude Code](https://claude.com/claude-code)
 - [GitHub CLI](https://cli.github.com/), logged in with `gh auth login`
 - macOS (the terminal board uses `open` to open links)
@@ -43,12 +43,12 @@ You can use the dashboard in two ways:
 ```bash
 git clone https://github.com/kamranbadirov/agent-dashboard.git
 cd agent-dashboard
-python3 -m venv .venv
-.venv/bin/pip install textual
+python3.11 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 ```
 
 The web board uses only the Python standard library.
-Only the terminal board needs `textual`.
+Only the terminal board needs the packages in `requirements.txt`, which are pinned because `textual-image` is used through its internals.
 
 ## Usage
 
@@ -120,9 +120,30 @@ Example:
 PORT=8080 STALE_HOURS=12 python3 server.py
 ```
 
+## Project layout
+
+```
+server.py              entry point (web board, --tui, --json)
+board/
+  core/                no UI and no HTTP; both boards use it
+    config.py          paths, env vars, constants
+    transcript.py      read a Claude Code session transcript
+    github.py          gh CLI calls and the PR cache
+    sessions.py        live and ended sessions, close an agent
+    classify.py        decide which group an agent belongs to
+    store.py           dismissed.json and titles.json
+    state.py           build_state(), the one function the boards call
+    notify.py          desktop notifications for new commits
+  web/                 HTTP server and static/ (the page)
+  assets/              repo images, shared by both boards; add <repo>.png to show a new repo
+  tui/                 terminal board: app, theme, icons, format, widgets/, screens
+```
+
+Imports only point down: `web` and `tui` use `core`, never the other way round.
+
 ## Notes
 
 - The server listens only on `127.0.0.1`. Other machines cannot reach it.
 - The close and remove actions (`POST /api/close` and `/api/dismiss`) accept only requests to `localhost` or `127.0.0.1` with a JSON body.
 - The dashboard caches PR data for 90 seconds to limit GitHub API calls.
-- The PR search and ticket links point to the `pheedloop` GitHub org and Linear workspace. Change them in `server.py` and `board.py` for your own org.
+- The PR search and ticket links point to the `pheedloop` GitHub org and Linear workspace. Change them in `board/core/github.py` and `board/tui/app.py` (and `board/web/static/index.html`) for your own org.
