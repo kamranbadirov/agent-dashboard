@@ -20,8 +20,9 @@ class AgentTile(Widget, can_focus=True):
         seen = {}
         for p in self.session["prs"]:
             path = repo_image(p["repo"])
-            if path and p["repo"].lower() not in seen:
-                seen[p["repo"].lower()] = (path, p)
+            key = p["repo"].lower()
+            if path and (key not in seen or (seen[key][1]["state"] != "OPEN" and p["state"] == "OPEN")):
+                seen[key] = (path, p)
         return list(seen.values())[:MAX_IMAGES]
 
     def compose(self):
@@ -37,7 +38,7 @@ class AgentTile(Widget, can_focus=True):
     def layout_images(self):
         images = list(self.query(RepoImage))
         for i, img in enumerate(images):
-            img.styles.offset = (self.size.width - 2 - (WIDTH + 1) * (len(images) - i), 1)
+            img.styles.offset = (2 + (WIDTH + 1) * i, 2)
             img.styles.width = WIDTH
             img.styles.height = HEIGHT
 
@@ -46,7 +47,6 @@ class AgentTile(Widget, can_focus=True):
         color = COLOR.get(s["status"], GRAY)
         width = max(10, self.size.width - 4)
         label = headline(s) if s["status"] == "your_move" else NAME.get(s["status"], s["status"])
-        refs = " ".join(f"#{p['number']}" for p in s["prs"][:3])
         muted = s["status"] in ("done", "ended")
         when = ago(s["lastActivity"])
         title = Text(s["title"], style=f"bold {MUTED if muted else INK}")
@@ -54,17 +54,20 @@ class AgentTile(Widget, can_focus=True):
         title.append(" " * max(1, width - title.cell_len - len(when)))
         title.append(when, style=MUTED)
         status = Text(label, style=f"bold {color}")
-        bottom, links = ticket_line(s)
-        self.links = [(a + 2, b + 2, url) for a, b, url in links]
+        indent = " " * ((WIDTH + 1) * len(self.badges))
+        ask = Text(indent + (s.get("pendingQuestion") or ""), style=MUTED)
+        chips_line, links = ticket_line(s)
+        bottom = Text(indent)
+        bottom.append_text(chips_line)
+        self.links = [(a + 2 + len(indent), b + 2 + len(indent), url) for a, b, url in links]
         bottom.truncate(max(1, width - 4), overflow="ellipsis")
         bottom.append(" " * max(1, width - bottom.cell_len - 3))
         bottom.append("✎", style=f"bold {MUTED}")
         bottom.append(" ")
         bottom.append("✕", style=f"bold {INK}")
         lines = []
-        reserve = (WIDTH + 1) * len(self.badges)
-        for row, body in enumerate((title, status, Text(s.get("pendingQuestion") or refs, style=MUTED), bottom)):
-            body.truncate(width - reserve if row in (1, 2) else width, overflow="ellipsis")
+        for body in (title, status, ask, bottom):
+            body.truncate(width, overflow="ellipsis")
             line = Text("▌ ", style=color)
             line.append_text(body)
             lines.append(line)
