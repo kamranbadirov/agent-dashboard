@@ -5,7 +5,7 @@ PYTHON ?= python3.11
 setup:
 	brew bundle --file=Brewfile
 	$(PYTHON) -m venv .venv
-	.venv/bin/pip install textual textual-image
+	.venv/bin/pip install -r requirements.txt
 
 shell:
 	@if [ -f .venv/bin/activate ]; then . .venv/bin/activate; fi; exec "$${SHELL:-/bin/sh}"

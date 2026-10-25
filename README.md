@@ -1,6 +1,6 @@
 # Agent Dashboard
 
-![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)
 ![Textual](https://img.shields.io/badge/TUI-Textual-5A4FCF)
 ![Claude Code](https://img.shields.io/badge/for-Claude%20Code-D97757?logo=anthropic&logoColor=white)
 ![GitHub CLI](https://img.shields.io/badge/needs-gh%20CLI-181717?logo=github)
@@ -44,11 +44,11 @@ You can use the dashboard in two ways:
 git clone https://github.com/kamranbadirov/agent-dashboard.git
 cd agent-dashboard
 python3.11 -m venv .venv
-.venv/bin/pip install textual textual-image
+.venv/bin/pip install -r requirements.txt
 ```
 
 The web board uses only the Python standard library.
-Only the terminal board needs `textual`.
+Only the terminal board needs the packages in `requirements.txt`, which are pinned because `textual-image` is used through its internals.
 
 ## Usage
 
@@ -135,7 +135,7 @@ board/
     state.py           build_state(), the one function the boards call
     notify.py          desktop notifications for new commits
   web/                 HTTP server and static/ (the page)
-  assets/              repo images, shared by both boards
+  assets/              repo images, shared by both boards; add <repo>.png to show a new repo
   tui/                 terminal board: app, theme, icons, format, widgets/, screens
 ```
 

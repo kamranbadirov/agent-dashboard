@@ -33,7 +33,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(500, json.dumps({"error": str(e)}).encode(), "application/json")
         elif self.path.startswith("/assets/"):
             f = (ASSETS / Path(self.path[len("/assets/"):].split("?")[0]).name)
-            ctype = {".png": "image/png", ".svg": "image/svg+xml"}.get(f.suffix)
+            ctype = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}.get(f.suffix.lower())
             if ctype and f.is_file():
                 self._send(200, f.read_bytes(), ctype)
             else:
@@ -59,6 +59,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 size = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(size))
+                if not isinstance(body, dict):
+                    raise ValueError("body must be an object")
             except Exception:
                 self._send(400, json.dumps({"ok": False, "message": "Bad request."}).encode(), "application/json")
                 return

@@ -12,7 +12,13 @@ def load_dismissed():
         return {}
 
 
+def valid_id(session_id):
+    return isinstance(session_id, str) and bool(session_id.strip())
+
+
 def dismiss_session(session_id):
+    if not valid_id(session_id):
+        return False, "Missing session."
     if session_id in live_sessions():
         return False, "Close the agent before removing it."
     dismissed = load_dismissed()
@@ -29,7 +35,9 @@ def load_titles():
 
 
 def rename_session(session_id, title):
-    title = " ".join((title or "").split())[:120]
+    if not valid_id(session_id):
+        return False, "Missing session."
+    title = " ".join((title if isinstance(title, str) else "").split())[:120]
     titles = load_titles()
     if title:
         titles[session_id] = title

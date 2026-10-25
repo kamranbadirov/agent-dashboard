@@ -53,6 +53,8 @@ def recent_ended(live_ids):
 
 
 def close_session(session_id):
+    if not isinstance(session_id, str) or not session_id.strip():
+        return False, "Missing session."
     meta = live_sessions().get(session_id)
     if not meta:
         return False, "That agent is not running."

@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
+from .assets import repo_images
 from .classify import action_reasons, classify
 from .config import AUTO_CLOSE_MERGED
 from .github import fetch_pr, my_open_prs, reviewed_prs
@@ -135,4 +136,8 @@ def build_state():
         if s["alive"] or (s.get("lastActivity") or "") > dismissed.get(s["sessionId"], "")
     ]
     sessions.sort(key=lambda s: s.get("lastActivity") or "", reverse=True)
-    return {"generatedAt": datetime.now(timezone.utc).isoformat(), "sessions": sessions}
+    return {
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "sessions": sessions,
+        "repoImages": {repo: f"/assets/{f.name}" for repo, f in repo_images().items()},
+    }
