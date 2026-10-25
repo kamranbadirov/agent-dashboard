@@ -19,6 +19,7 @@ from .styles import APP_CSS
 from .theme import INK, MUTED, SECTIONS
 from .widgets.preview import Preview, SectionHeader
 from .widgets.tile import AgentTile
+from .widgets.topbar import TopBar
 
 REFRESH_SECONDS = 20
 
@@ -38,6 +39,7 @@ class Board(App):
         Binding("x", "close_agent", "Close"),
         Binding("e", "toggle_inactive", "Inactive"),
         Binding("r", "refresh", "Refresh"),
+        Binding("escape", "clear_filter", "Clear filter", show=False),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -46,18 +48,19 @@ class Board(App):
         self.state = None
         self.signature = None
         self.show_inactive = False
+        self.status_filter = None
         self.focused_id = None
         self.resume_target = None
 
     def compose(self) -> ComposeResult:
-        yield Static(id="top")
+        yield TopBar(id="top")
         with Horizontal(id="main"):
             yield VerticalScroll(id="list")
             yield Preview(id="preview")
         yield Footer()
 
     def on_mount(self):
-        self.query_one("#top", Static).update(Text("Agents  loading…", style=f"bold {INK}"))
+        self.query_one("#top", TopBar).update(Text("Agents  loading…", style=f"bold {INK}"))
         self.load()
         self.set_interval(REFRESH_SECONDS, self.load)
 
@@ -71,34 +74,56 @@ class Board(App):
             return
         self.call_from_thread(self.apply_state, state)
 
-    def visible(self):
+    def listed(self):
         sessions = (self.state or {}).get("sessions", [])
         return [s for s in sessions if s["status"] != "ended" or self.show_inactive]
 
+    def visible(self):
+        return [s for s in self.listed() if self.status_filter in (None, s["status"])]
+
+    def toggle_filter(self, key):
+        self.status_filter = None if key in (None, self.status_filter) else key
+        if self.state:
+            self.apply_state(self.state, force=True)
+
+    def action_clear_filter(self):
+        self.toggle_filter(None)
+
     def render_top(self):
-        sessions = self.visible()
         counts = {}
-        for s in sessions:
+        for s in self.listed():
             counts[s["status"]] = counts.get(s["status"], 0) + 1
+        if self.status_filter and not counts.get(self.status_filter):
+            self.status_filter = None
+        active = self.status_filter
         t = Text()
+        hits = []
+        start = t.cell_len
         t.append("Agents", style=f"bold {INK}")
+        hits.append((start, t.cell_len, None))
         t.append("    ")
         for key, name, color in SECTIONS:
             if not counts.get(key):
                 continue
-            t.append("● ", style=color)
-            t.append(f"{counts[key]} ", style=f"bold {INK}")
-            t.append(f"{name.lower()}     ", style=MUTED)
+            dim = active and key != active
+            start = t.cell_len
+            t.append("● ", style=MUTED if dim else color)
+            t.append(f"{counts[key]} ", style=f"bold {MUTED if dim else INK}")
+            t.append(name.lower(), style=f"underline {color}" if key == active else MUTED)
+            hits.append((start, t.cell_len, key))
+            t.append("     ")
         stamp = f"updated {datetime.now().strftime('%H:%M')}"
         width = self.size.width - 4
         t.append(" " * max(2, width - t.cell_len - len(stamp)))
         t.append(stamp, style=MUTED)
-        self.query_one("#top", Static).update(t)
+        top = self.query_one("#top", TopBar)
+        top.hits = hits
+        top.update(t)
 
     def apply_state(self, state, force=False):
         sig = json.dumps([(s["sessionId"], s["status"], s["reasons"], s["title"], s["lastActivity"],
                            [(p["key"], p["state"], p["unresolvedThreads"], p["newComments"]) for p in s["prs"]])
-                          for s in state["sessions"]] + [self.show_inactive])
+                          for s in state["sessions"]] + [self.show_inactive, self.status_filter])
         self.state = state
         self.render_top()
         if sig == self.signature and not force:
