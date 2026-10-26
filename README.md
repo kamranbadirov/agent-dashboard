@@ -145,5 +145,5 @@ Imports only point down: `web` and `tui` use `core`, never the other way round.
 
 - The server listens only on `127.0.0.1`. Other machines cannot reach it.
 - The close and remove actions (`POST /api/close` and `/api/dismiss`) accept only requests to `localhost` or `127.0.0.1` with a JSON body.
-- The dashboard caches PR data for 90 seconds to limit GitHub API calls.
+- The dashboard caches PR data for 5 minutes to limit GitHub API calls.
 - The PR search and ticket links point to the `pheedloop` GitHub org and Linear workspace. Change them in `board/core/github.py` and `board/tui/app.py` (and `board/web/static/index.html`) for your own org.
