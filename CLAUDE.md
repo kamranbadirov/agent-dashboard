@@ -27,8 +27,16 @@ board/
     assets.py        repo images found in board/assets
     state.py         build_state(), the one function both boards call
     notify.py        desktop notifications for new commits
+    cache.py         ring buffer, JSON file saved in batches, batched log appender
+    root.py          find the root checkout, list its platforms
+    jobs.py          run root's scripts in a thread, keep their steps and output
+    ptyhost.py       a program in a pseudo-terminal, with its output saved
+    agents.py        start and resume agents: in the board, in cmux, or in a terminal app
+    wizard/          the work wizard without UI: flows.py (questions), commands.py, preflight.py, prs.py, run.py
   web/               HTTP server and static/index.html
   tui/               terminal board (Textual)
+    wizard/          the wizard screen and its inputs; it only renders core/wizard/flows.py
+    widgets/terminal.py   the typeable agent terminal in the right panel
   assets/            repo images, shared by both boards
 ```
 
@@ -40,7 +48,10 @@ board/
 - Repo logos come from `board/assets/<repo>.png`. To add a repo, add the file. Do not list repos in code.
 - The terminal board needs Python 3.10+ because of `textual-image`. Its dependencies are pinned in `requirements.txt` because `tui/widgets/repo_image.py` uses `textual-image` internals.
 - Terminal layout comes in whole rows and columns. Spacing in pixels (such as 8px) can only be matched sideways, not vertically.
-- `titles.json` and `dismissed.json` are local state and are gitignored.
+- `titles.json`, `dismissed.json`, `agents.json` and `terminals/` are local state and are gitignored.
+- The work wizard (key `w` in the terminal board) runs the scripts of the root checkout (`ROOT_REPO`, default `~/Documents/root`). Questions are data in `core/wizard/flows.py`; to add or change a question, change it there, not in `tui/`. Answers reach root only through its environment variable overrides (`BRANCH`, `BACKEND`, `PRS`, `PLATFORM`, ...). Commands are argv lists, never shell strings. The repo list is read from root's `scripts/_lib.sh`, not copied.
+- Only the terminal board has the wizard and the agent terminal for now. They use `pyte` (pinned) to draw the terminal. `AGENT_COMMAND` replaces `claude`, which is how to test with a fake agent.
+- Writes are cheap by design: terminal output is merged in memory and appended to disk in batches, and `agents.json` is saved once after a quiet moment through a temp file and rename (`core/cache.py`). Do not write to disk per chunk or per keystroke.
 
 ## Design
 

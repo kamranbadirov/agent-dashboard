@@ -3,6 +3,7 @@ from textual.widget import Widget
 
 from ..format import ago, headline, ticket_line
 from ..icons import repo_image
+from ..jobs_view import progress_bar
 from ..theme import COLOR, GRAY, INK, MUTED, NAME
 from .repo_image import HEIGHT, WIDTH, RepoImage
 
@@ -61,6 +62,8 @@ class AgentTile(Widget, can_focus=True):
         status = Text(label, style=f"bold {color}")
         ask = Text(s.get("pendingQuestion") or "", style=MUTED)
         bottom, links = ticket_line(s)
+        if s.get("job"):
+            bottom = progress_bar(s["job"].progress, max(1, width - 8))
         self.links = [(a + 2, b + 2, url) for a, b, url in links]
         if self.chips_width != bottom.cell_len:
             self.chips_width = bottom.cell_len
