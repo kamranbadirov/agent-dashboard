@@ -1,16 +1,25 @@
 .PHONY: setup shell tui web
 
 PYTHON ?= python3.11
+VENV := .venv
+STAMP := $(VENV)/.installed
 
 setup:
 	brew bundle --file=Brewfile
-	$(PYTHON) -m venv .venv
-	.venv/bin/pip install -r requirements.txt
+	@rm -f $(STAMP)
+	@$(MAKE) $(STAMP)
+
+$(STAMP): requirements.txt
+	$(PYTHON) -m venv --clear $(VENV)
+	$(VENV)/bin/pip install -r requirements.txt
+	$(VENV)/bin/pip check
+	$(VENV)/bin/python -c "import textual, textual_image, PIL"
+	@touch $@
 
 shell:
 	@if [ -f .venv/bin/activate ]; then . .venv/bin/activate; fi; exec "$${SHELL:-/bin/sh}"
 
-tui:
+tui: $(STAMP)
 	.venv/bin/python server.py --tui
 
 web:
