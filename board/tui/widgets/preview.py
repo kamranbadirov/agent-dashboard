@@ -3,6 +3,7 @@ from textual.containers import VerticalScroll
 from textual.widgets import Static
 
 from ..format import ago, chips, pr_badges
+from ..jobs_view import job_text
 from ..theme import AQUA, COLOR, GRAY, INK, MUTED, NAME
 
 
@@ -33,6 +34,11 @@ class Preview(VerticalScroll):
         t.append(f" {NAME.get(s['status'], s['status'])} ", style=f"bold #0d1117 on {color}")
         t.append(f"   {ago(s['lastActivity'])}\n\n", style=MUTED)
         t.append(s["title"] + "\n", style=f"bold {INK}")
+        if s.get("job"):
+            t.append("\n")
+            t.append_text(job_text(s["job"]))
+            body.update(t)
+            return
         meta = "   ".join(v for v in [s.get("name"), s.get("gitBranch")] if v)
         if meta:
             t.append(meta + "\n", style=MUTED)
