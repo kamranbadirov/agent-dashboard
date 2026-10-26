@@ -1,13 +1,36 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
+from . import agents
 from .assets import repo_images
 from .classify import action_reasons, classify
-from .config import AUTO_CLOSE_MERGED
+from .config import AUTO_CLOSE_MERGED, STARTING_GRACE_SECONDS
 from .github import fetch_pr, my_open_prs, reviewed_prs
 from .sessions import auto_close_merged, find_transcript, live_sessions, recent_ended
 from .store import load_dismissed, load_titles
 from .transcript import parse_transcript, tickets_in
+
+
+def starting_agents(known):
+    """Agents the board started that have no transcript or session file. A new one would otherwise
+    be missing until it has written; one that never wrote stays as an ended tile until dismissed."""
+    now = datetime.now(timezone.utc)
+    out = []
+    for sid, record in list(agents.registry().items()):
+        if sid in known:
+            continue
+        started = datetime.fromisoformat(record["createdAt"])
+        starting = (now - started).total_seconds() <= STARTING_GRACE_SECONDS
+        out.append(
+            {
+                "sessionId": sid, "name": None, "pid": None, "alive": False, "busy": starting, "status": "working" if starting else "ended",
+                "reasons": [], "title": record["title"], "tickets": [], "summary": None, "lastAssistant": None,
+                "lastUserPrompt": record.get("prompt"), "pendingTool": None, "pendingQuestion": None,
+                "lastActivity": record["createdAt"], "cwd": record["cwd"], "gitBranch": record.get("branch"),
+                "remoteUrl": None, "resumeCmd": f"claude --resume {sid}", "prs": [],
+            }
+        )
+    return out
 
 
 def build_state():
@@ -27,7 +50,7 @@ def build_state():
             info = parse_transcript(path)
         except Exception as e:
             info = {"title": None, "error": str(e), "tickets": [], "prs": []}
-        if not alive and not info["tickets"] and not info["prs"]:
+        if not alive and not info["tickets"] and not info["prs"] and sid not in agents.registry():
             continue
         if not alive and not info.get("lastActivity"):
             continue
@@ -93,6 +116,7 @@ def build_state():
                 "prs": prs,
             }
         )
+    sessions += starting_agents({s["sessionId"] for s in sessions})
     titles = load_titles()
     linked = {p["key"] for s in sessions for p in s["prs"]}
     for pr in reviewed:
