@@ -7,26 +7,21 @@ from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, ItemGrid, Vertical, VerticalScroll
+from textual.containers import Horizontal, ItemGrid, VerticalScroll
 from textual.widgets import Footer, Static
 
-from ..core import agents, jobs
 from ..core.notify import notify_new_commits
 from ..core.sessions import close_session
 from ..core.state import build_state
 from ..core.store import dismiss_session, rename_session
-from .jobs_view import job_session, with_agent_record
 from .screens import ConfirmClose, RenameTitle
 from .styles import APP_CSS
 from .theme import INK, MUTED, SECTIONS
 from .widgets.preview import Preview, SectionHeader
-from .widgets.terminal import AgentTerminal, TerminalView
 from .widgets.tile import AgentTile
-from .widgets.topbar import WIZARD_HIT, TopBar
-from .wizard.screen import WizardScreen
+from .widgets.topbar import TopBar
 
 REFRESH_SECONDS = 20
-NEW_WORK_LABEL = " + New work  w "
 
 
 class Board(App):
@@ -36,7 +31,6 @@ class Board(App):
     BINDINGS = [
         Binding("down,j,right,l", "move(1)", "Move", show=False),
         Binding("up,k,left,h", "move(-1)", "Move", show=False),
-        Binding("w", "wizard", "New work"),
         Binding("enter", "resume", "Resume"),
         Binding("o", "open_session", "Open"),
         Binding("p", "open_pr", "PR"),
@@ -62,17 +56,13 @@ class Board(App):
         yield TopBar(id="top")
         with Horizontal(id="main"):
             yield VerticalScroll(id="list")
-            with Vertical(id="side"):
-                yield Preview(id="preview")
-                yield AgentTerminal(id="terminal")
+            yield Preview(id="preview")
         yield Footer()
 
     def on_mount(self):
         self.query_one("#top", TopBar).update(Text("Agents  loading…", style=f"bold {INK}"))
-        self.query_one("#terminal").display = False
         self.load()
         self.set_interval(REFRESH_SECONDS, self.load)
-        self.set_interval(1, self.refresh_jobs)
 
     @work(thread=True, exclusive=True)
     def load(self):
@@ -84,13 +74,8 @@ class Board(App):
             return
         self.call_from_thread(self.apply_state, state)
 
-    def with_record(self, session):
-        record = agents.record_for(session["sessionId"])
-        return with_agent_record(session, record) if record else session
-
     def listed(self):
-        started = [self.with_record(s) for s in (self.state or {}).get("sessions", [])]
-        sessions = [job_session(j) for j in jobs.listed()] + started
+        sessions = (self.state or {}).get("sessions", [])
         return [s for s in sessions if s["status"] != "ended" or self.show_inactive]
 
     def visible(self):
@@ -129,11 +114,7 @@ class Board(App):
             t.append("     ")
         stamp = f"updated {datetime.now().strftime('%H:%M')}"
         width = self.size.width - 4
-        t.append(" " * max(2, width - t.cell_len - len(stamp) - len(NEW_WORK_LABEL) - 4))
-        start = t.cell_len
-        t.append(NEW_WORK_LABEL, style=f"bold #0d1117 on {INK}")
-        hits.append((start, t.cell_len, WIZARD_HIT))
-        t.append("    ")
+        t.append(" " * max(2, width - t.cell_len - len(stamp)))
         t.append(stamp, style=MUTED)
         top = self.query_one("#top", TopBar)
         top.hits = hits
@@ -142,9 +123,7 @@ class Board(App):
     def apply_state(self, state, force=False):
         sig = json.dumps([(s["sessionId"], s["status"], s["reasons"], s["title"], s["lastActivity"],
                            [(p["key"], p["state"], p["unresolvedThreads"], p["newComments"]) for p in s["prs"]])
-                          for s in state["sessions"]]
-                         + [(j.id, j.state, j.current_step) for j in jobs.listed()]
-                         + [self.show_inactive, self.status_filter])
+                          for s in state["sessions"]] + [self.show_inactive, self.status_filter])
         self.state = state
         self.render_top()
         if sig == self.signature and not force:
@@ -177,17 +156,10 @@ class Board(App):
     def cards(self):
         return [w for w in self.query("AgentTile")]
 
-    def leave_terminal(self):
-        card = next((c for c in self.cards() if c.session["sessionId"] == self.focused_id), None)
-        if card:
-            card.focus()
-
     def restore_focus(self):
-        if isinstance(self.focused, TerminalView):
-            return
         cards = self.cards()
         if not cards:
-            self.show_side(None)
+            self.query_one(Preview).show(None)
             return
         target = next((c for c in cards if c.session["sessionId"] == self.focused_id), cards[0])
         target.focus()
@@ -196,17 +168,8 @@ class Board(App):
         w = event.widget
         if hasattr(w, "session"):
             self.focused_id = w.session["sessionId"]
-            self.show_side(w.session)
+            self.query_one(Preview).show(w.session)
             w.scroll_visible()
-
-    def show_side(self, session):
-        record = session and agents.board_agent(session["sessionId"])
-        self.query_one("#terminal").display = bool(record)
-        self.query_one("#preview").display = not record
-        if record:
-            self.query_one(AgentTerminal).show(record, session)
-        else:
-            self.query_one(Preview).show(session)
 
     def selected(self):
         w = self.focused
@@ -257,41 +220,9 @@ class Board(App):
         elif s:
             self.notify("This session has no ticket.")
 
-    def action_wizard(self):
-        def closed(result):
-            job, action = result if isinstance(result, tuple) else (result, None)
-            if job and job.state == "running":
-                self.notify(f"Setting up {job.label}. Its tile shows the progress.")
-            if action == "open_agent" and job.agent:
-                self.focused_id = job.agent["sessionId"]
-                self.notify("The agent's tile appears as soon as it has started." if not self.focus_agent() else "Agent opened.")
-            self.refresh_jobs()
-
-        self.push_screen(WizardScreen(), closed)
-
-    def focus_agent(self):
-        card = next((c for c in self.cards() if c.session["sessionId"] == self.focused_id), None)
-        if card:
-            card.focus()
-        return bool(card)
-
-    def refresh_jobs(self):
-        for job in jobs.finished_unreported():
-            if job.state == "done":
-                self.notify(job.notice or f"{job.label} is ready.", severity="warning" if job.notice else "information")
-            else:
-                self.notify(f"{job.label} failed. Select its tile for the output.", severity="error")
-        if self.state:
-            self.apply_state(self.state)
-
     def action_close_agent(self):
         s = self.selected()
         if not s:
-            return
-        if s["sessionId"].startswith("job:"):
-            ok, message = jobs.dismiss(s["sessionId"][len("job:"):])
-            self.notify(message, severity="information" if ok else "warning")
-            self.refresh_jobs()
             return
         if not s["alive"]:
             self.dismiss_worker(s["sessionId"])
@@ -305,7 +236,7 @@ class Board(App):
 
     def action_rename_agent(self):
         s = self.selected()
-        if not s or s.get("job"):
+        if not s:
             return
 
         def done(title):
@@ -335,9 +266,6 @@ class Board(App):
     def action_resume(self):
         s = self.selected()
         if not s:
-            return
-        if agents.board_agent(s["sessionId"]):
-            self.query_one(AgentTerminal).focus_terminal()
             return
         if not s.get("resumeCmd"):
             self.action_open_pr()

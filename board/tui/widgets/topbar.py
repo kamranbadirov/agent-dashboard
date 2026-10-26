@@ -1,7 +1,5 @@
 from textual.widgets import Static
 
-WIZARD_HIT = "wizard"
-
 
 class TopBar(Static):
     def __init__(self, **kwargs):
@@ -14,8 +12,5 @@ class TopBar(Static):
             return
         for start, end, key in self.hits:
             if start <= offset.x < end:
-                if key == WIZARD_HIT:
-                    self.app.action_wizard()
-                else:
-                    self.app.toggle_filter(key)
+                self.app.toggle_filter(key)
                 return
