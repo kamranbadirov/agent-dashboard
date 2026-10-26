@@ -20,6 +20,11 @@ TERMINAL_APPS = {
 _registry = JsonFile(AGENTS_FILE, {})
 
 
+def registry():
+    """Every agent this board started, by session ID."""
+    return _registry.data
+
+
 def installed_terminals():
     return [name for name, path in TERMINAL_APPS.items() if os.path.exists(path)]
 

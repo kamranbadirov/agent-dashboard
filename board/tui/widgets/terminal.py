@@ -1,3 +1,5 @@
+import re
+
 import pyte
 from rich.style import Style
 from rich.text import Text
@@ -16,6 +18,19 @@ MOVEMENT = {
     "delete": b"\x1b[3~", "up": b"\x1b[A", "down": b"\x1b[B", "right": b"\x1b[C", "left": b"\x1b[D",
     "home": b"\x1b[H", "end": b"\x1b[F", "pageup": b"\x1b[5~", "pagedown": b"\x1b[6~",
 }
+
+
+# pyte drops the < > = that starts a private CSI sequence and runs the rest as the plain one, so
+# modifyOtherKeys (ESC[>4;2m) turns underline on and the kitty keyboard ones (ESC[>5u) move the cursor.
+PRIVATE_CSI = re.compile(rb"\x1b\[[<>=][0-9;:]*[ -/]*[@-~]")
+PARTIAL_CSI = re.compile(rb"\x1b(\[([<>=][0-9;:]*[ -/]*)?)?$")
+
+
+def strip_private_csi(data):
+    """The data without those sequences, and the unfinished one at its end, to put in front of the next chunk."""
+    data = PRIVATE_CSI.sub(b"", data)
+    tail = PARTIAL_CSI.search(data)
+    return (data[:tail.start()], data[tail.start():]) if tail else (data, b"")
 
 
 def to_bytes(event):
@@ -61,6 +76,7 @@ class TerminalView(Widget, can_focus=True):
         self.key = None
         self.pty = None
         self.seen = 0
+        self.pending = b""
         self.dirty = False
         self.emulator = pyte.Screen(100, 30)
         self.stream = pyte.ByteStream(self.emulator)
@@ -73,21 +89,26 @@ class TerminalView(Widget, can_focus=True):
         self.pty = ptyhost.get(session_id)
         self.emulator.reset()
         self.seen = 0
+        self.pending = b""
         if self.pty:
             self.pty.resize(self.emulator.lines, self.emulator.columns)
         else:
-            self.stream.feed(ptyhost.history(session_id))
+            self.feed(ptyhost.history(session_id))
         self.dirty = True
 
     @property
     def running(self):
         return bool(self.pty and self.pty.alive)
 
+    def feed(self, data):
+        data, self.pending = strip_private_csi(self.pending + data)
+        self.stream.feed(data)
+
     def poll(self):
         if self.pty:
             data, self.seen = self.pty.buffer.read_since(self.seen)
             if data:
-                self.stream.feed(data)
+                self.feed(data)
                 self.dirty = True
         if self.dirty:
             self.dirty = False
@@ -121,6 +142,7 @@ class TerminalView(Widget, can_focus=True):
     def resume(self):
         self.pty = agents.resume_agent(self.key)
         self.seen = 0
+        self.pending = b""
         if self.pty:
             self.emulator.reset()
             self.pty.resize(self.emulator.lines, self.emulator.columns)

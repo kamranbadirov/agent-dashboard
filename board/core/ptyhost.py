@@ -27,6 +27,7 @@ class PtySession:
 
     def __init__(self, key, argv, cwd, rows=30, cols=100):
         self.key = key
+        self.closed = False  # the master end is closed once the program has exited
         self.buffer = RingBuffer(TERMINAL_BUFFER_BYTES)
         self.master, slave = pty.openpty()
         self.resize(rows, cols)
@@ -51,6 +52,7 @@ class PtySession:
             self.log.write(chunk)
         self.process.wait()
         self.log.close()
+        self.closed = True
         os.close(self.master)
 
     @property
@@ -58,11 +60,19 @@ class PtySession:
         return self.process.poll() is None
 
     def write(self, data):
-        if self.alive:
-            os.write(self.master, data)
+        if self.alive and not self.closed:
+            try:
+                os.write(self.master, data)
+            except OSError:
+                pass
 
     def resize(self, rows, cols):
-        fcntl.ioctl(self.master, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+        if self.closed:
+            return
+        try:
+            fcntl.ioctl(self.master, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+        except OSError:
+            pass  # the program exited and the pump closed the master just now
 
     def stop(self):
         if self.alive:
