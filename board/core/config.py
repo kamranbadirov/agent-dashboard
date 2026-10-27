@@ -14,7 +14,7 @@ STALE_HOURS = int(os.environ.get("STALE_HOURS", "24"))
 AUTO_CLOSE_MERGED = os.environ.get("AUTO_CLOSE_MERGED", "1") != "0"
 DISMISSED_FILE = ROOT / "dismissed.json"
 TITLES_FILE = ROOT / "titles.json"
-PR_CACHE_SECONDS = 90
+PR_CACHE_SECONDS = 300
 WATCH_SECONDS = int(os.environ.get("WATCH_SECONDS", "60"))
 NOTIFIED_FILE = HOME / ".claude" / "agent-dashboard-notified.json"
 TAIL_BYTES = 600_000
