@@ -30,7 +30,7 @@ board/
     root.py          find the root checkout, list its platforms
     jobs.py          run root's scripts in a thread, keep their steps and output
     ptyhost.py       a program in a pseudo-terminal, with its output saved
-    agents.py        start and resume agents: in the board, in cmux, or in a terminal app
+    agents.py        start and resume agents: in the board or in a terminal app
     wizard/          the work wizard without UI: flows.py (questions), commands.py, preflight.py, prs.py, run.py
   tui/               terminal board (Textual)
     wizard/          the wizard screen and its inputs; it only renders core/wizard/flows.py

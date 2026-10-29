@@ -332,7 +332,7 @@ class WizardScreen(ModalScreen):
         view = ReadyView()
         self.body(view)
         meta = self.job.meta
-        opener = {"background": ("Open agent", "open_agent"), "cmux": ("Open in cmux", "bring"),
+        opener = {"background": ("Open agent", "open_agent"),
                   "terminal": (f"Open in {meta['terminal_app']}", "bring")}.get(meta["where"])
         right = ([(*opener, "plain")] if meta["agent_prompt"] and opener else []) + [("Run dev servers", "servers", "primary")]
         self.foot([("Back to board", "close", "plain")], right)
