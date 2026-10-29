@@ -1,3 +1,4 @@
+import os
 import shutil
 import socket
 import subprocess
@@ -46,7 +47,9 @@ def has_docker():
 
 
 def has_aws():
-    return check("AWS login", succeeds(["aws", "configure", "export-credentials"]), "aws sso login")
+    profile = os.environ.get("AWS_PROFILE", "default")
+    return check("AWS login", succeeds(["aws", "configure", "export-credentials", "--profile", profile]),
+                 f"aws sso login --profile {profile}")
 
 
 def has_shared_database():

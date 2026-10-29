@@ -67,7 +67,7 @@ class SummaryView(Vertical):
             return True
         return self.query_one("#typed", Input).value.strip() == self.typed_word
 
-    def show_checks(self, results):
+    def show_checks(self, results, recheck_seconds=None):
         text = Text()
         for i, r in enumerate(results):
             text.append("\n" if i else "")
@@ -75,6 +75,8 @@ class SummaryView(Vertical):
             text.append(r["label"], style=INK)
             if not r["ok"]:
                 text.append(f"  →  {r['fix']}", style=MUTED)
+        if recheck_seconds and not all(r["ok"] for r in results):
+            text.append(f"\n\nFix it in another terminal. The checks run again every {recheck_seconds} seconds.", style=MUTED)
         self.query_one("#checks", Static).update(text if results else Text("Nothing to check.", style=MUTED))
 
 
