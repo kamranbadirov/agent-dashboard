@@ -1,5 +1,6 @@
 import os
 import shlex
+import shutil
 import subprocess
 import uuid
 from datetime import datetime, timezone
@@ -68,9 +69,12 @@ def launch_elsewhere(key, name, cwd, argv, where, app):
 
 def run_dev_servers(platform, where, app):
     """`make run` in the platform. It needs a real terminal, so a board agent's owner gets cmux or a terminal app."""
-    place = where if where in (CMUX, TERMINAL) else (CMUX if os.path.exists("/Applications/cmux.app") else TERMINAL)
-    result = launch_elsewhere(f"run-{os.path.basename(platform)}", f"{os.path.basename(platform)} servers", platform,
-                              ["make", "run"], place, app)
+    place = where if where in (CMUX, TERMINAL) else (CMUX if shutil.which("cmux") else TERMINAL)
+    try:
+        result = launch_elsewhere(f"run-{os.path.basename(platform)}", f"{os.path.basename(platform)} servers", platform,
+                                  ["make", "run"], place, app)
+    except OSError as e:
+        return False, f"Could not start the dev servers: {e}"
     return result.returncode == 0, result.stderr.strip() or "Started."
 
 
@@ -90,7 +94,10 @@ def start_agent(cwd, prompt, where, terminal_app=None, title="Agent", prs=None):
     if where == BACKGROUND:
         ptyhost.spawn(record["sessionId"], argv, record["cwd"])
     elif where in (CMUX, TERMINAL):
-        result = launch_elsewhere(record["sessionId"], record["title"], record["cwd"], argv, where, terminal_app)
+        try:
+            result = launch_elsewhere(record["sessionId"], record["title"], record["cwd"], argv, where, terminal_app)
+        except OSError as e:
+            return False, f"Could not open the terminal: {e}", None
     else:
         return False, "Unknown place to run the agent.", None
     if where != BACKGROUND and result.returncode != 0:
