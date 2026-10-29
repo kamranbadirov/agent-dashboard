@@ -97,6 +97,7 @@ Set these environment variables to change the defaults:
 |----------|---------|---------|
 | `ENDED_LOOKBACK_HOURS` | `72` | How far back to look for ended sessions. |
 | `STALE_HOURS` | `24` | Hours without activity before an agent becomes inactive. |
+| `NOTIFY_NEEDS_YOU` | `1` | Set to `0` to stop the desktop notification when an agent asks a question or waits for a tool approval. |
 | `AUTO_CLOSE_MERGED` | `1` | Set to `0` to stop the dashboard from closing idle agents whose PRs are all merged or closed. |
 
 Example:

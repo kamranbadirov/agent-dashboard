@@ -15,6 +15,8 @@ DISMISSED_FILE = ROOT / "dismissed.json"
 TITLES_FILE = ROOT / "titles.json"
 PR_CACHE_SECONDS = 300
 NOTIFIED_FILE = HOME / ".claude" / "agent-dashboard-notified.json"
+NEEDS_YOU_FILE = HOME / ".claude" / "agent-dashboard-needs-you.json"
+NOTIFY_NEEDS_YOU = os.environ.get("NOTIFY_NEEDS_YOU", "1") != "0"
 TAIL_BYTES = 600_000
 
 GITHUB_ORG = "pheedloop"

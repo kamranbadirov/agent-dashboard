@@ -25,7 +25,7 @@ board/
     store.py         dismissed.json and titles.json
     assets.py        repo images found in board/assets
     state.py         build_state(), the one function the board calls
-    notify.py        desktop notifications for new commits
+    notify.py        desktop notifications for new commits and for agents that need you
     cache.py         ring buffer, JSON file saved in batches, batched log appender
     root.py          find the root checkout, list its platforms
     jobs.py          run root's scripts in a thread, keep their steps and output
