@@ -11,7 +11,7 @@ from textual.containers import Horizontal, ItemGrid, Vertical, VerticalScroll
 from textual.widgets import Footer, Static
 
 from ..core import agents, jobs
-from ..core.notify import notify_new_commits
+from ..core.notify import notify_needs_you, notify_new_commits
 from ..core.sessions import close_session
 from ..core.state import build_state
 from ..core.store import dismiss_session, rename_session
@@ -79,6 +79,7 @@ class Board(App):
         try:
             state = build_state()
             notify_new_commits(state)
+            notify_needs_you(state)
         except Exception as e:
             self.call_from_thread(self.notify, str(e), severity="error")
             return
