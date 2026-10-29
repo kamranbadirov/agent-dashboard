@@ -1,4 +1,4 @@
-.PHONY: setup shell tui web
+.PHONY: setup shell tui
 
 PYTHON ?= python3.11
 VENV := .venv
@@ -21,6 +21,3 @@ shell:
 
 tui: $(STAMP)
 	.venv/bin/python server.py --tui
-
-web:
-	python3 server.py

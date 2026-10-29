@@ -27,9 +27,7 @@ Each agent goes into one group:
 | **Done** | All PRs of the session are merged or closed. |
 | **Inactive** | The session ended or had no activity for 24 hours. |
 
-You can use the dashboard in two ways:
-- **Web board** in the browser.
-- **Terminal board** (TUI, a text interface that runs in the terminal).
+The dashboard is a terminal board (TUI, a text interface that runs in the terminal).
 
 ## Requirements
 
@@ -47,23 +45,12 @@ python3.11 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-The web board uses only the Python standard library.
-Only the terminal board needs the packages in `requirements.txt`, which are pinned because `textual-image` is used through its internals.
+The packages in `requirements.txt` are pinned because `textual-image` is used through its internals.
 
 ## Usage
 
-### Web board
-
 ```bash
 python3 server.py
-```
-
-Open http://localhost:7777.
-
-### Terminal board
-
-```bash
-python3 server.py --tui
 ```
 
 | Key | Action |
@@ -79,14 +66,13 @@ python3 server.py --tui
 | `q` | Quit |
 
 The board refreshes every 20 seconds.
-You can also click the `✕` on a card, or the button in the preview pane.
 
 ### Closing and removing agents
 
-Every card has a `✕` button. What it does depends on the agent:
+Press `x` on an agent. What it does depends on the agent:
 
 - **Running agent:** the dashboard asks you to confirm, then stops the agent with `SIGTERM`.
-- **Ended or done agent:** the dashboard removes the card at once. It does not stop anything.
+- **Ended or done agent:** the dashboard removes the tile at once. It does not stop anything.
 
 The dashboard saves removed sessions in `dismissed.json`.
 A removed session comes back only if it has new activity.
@@ -109,7 +95,6 @@ Set these environment variables to change the defaults:
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `PORT` | `7777` | The port for the web board. |
 | `ENDED_LOOKBACK_HOURS` | `72` | How far back to look for ended sessions. |
 | `STALE_HOURS` | `24` | Hours without activity before an agent becomes inactive. |
 | `AUTO_CLOSE_MERGED` | `1` | Set to `0` to stop the dashboard from closing idle agents whose PRs are all merged or closed. |
@@ -117,33 +102,30 @@ Set these environment variables to change the defaults:
 Example:
 
 ```bash
-PORT=8080 STALE_HOURS=12 python3 server.py
+STALE_HOURS=12 python3 server.py
 ```
 
 ## Project layout
 
 ```
-server.py              entry point (web board, --tui, --json)
+server.py              entry point (terminal board, --json)
 board/
-  core/                no UI and no HTTP; both boards use it
+  core/                no UI and no HTTP; the board uses it
     config.py          paths, env vars, constants
     transcript.py      read a Claude Code session transcript
     github.py          gh CLI calls and the PR cache
     sessions.py        live and ended sessions, close an agent
     classify.py        decide which group an agent belongs to
     store.py           dismissed.json and titles.json
-    state.py           build_state(), the one function the boards call
+    state.py           build_state(), the one function the board calls
     notify.py          desktop notifications for new commits
-  web/                 HTTP server and static/ (the page)
-  assets/              repo images, shared by both boards; add <repo>.png to show a new repo
+  assets/              repo images; add <repo>.png to show a new repo
   tui/                 terminal board: app, theme, icons, format, widgets/, screens
 ```
 
-Imports only point down: `web` and `tui` use `core`, never the other way round.
+Imports only point down: `tui` uses `core`, never the other way round.
 
 ## Notes
 
-- The server listens only on `127.0.0.1`. Other machines cannot reach it.
-- The close and remove actions (`POST /api/close` and `/api/dismiss`) accept only requests to `localhost` or `127.0.0.1` with a JSON body.
 - The dashboard caches PR data for 5 minutes to limit GitHub API calls.
-- The PR search and ticket links point to the `pheedloop` GitHub org and Linear workspace. Change them in `board/core/github.py` and `board/tui/app.py` (and `board/web/static/index.html`) for your own org.
+- The PR search and ticket links point to the `pheedloop` GitHub org and Linear workspace. Change them in `board/core/github.py` and `board/tui/app.py` for your own org.

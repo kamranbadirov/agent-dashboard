@@ -2,12 +2,9 @@ import fcntl
 import json
 import shutil
 import subprocess
-import sys
-import time
 
-from .config import NOTIFIED_FILE, WATCH_SECONDS
+from .config import NOTIFIED_FILE
 from .github import my_login
-from .state import build_state
 
 
 def send_notification(title, message, url, group):
@@ -49,12 +46,3 @@ def notify_new_commits(state):
             p.get("sinceReviewUrl") or p["url"],
             p["key"],
         )
-
-
-def watch():
-    while True:
-        try:
-            notify_new_commits(build_state())
-        except Exception as e:
-            print(f"watch failed: {e}", file=sys.stderr)
-        time.sleep(WATCH_SECONDS)
