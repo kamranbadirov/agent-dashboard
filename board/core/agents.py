@@ -99,6 +99,18 @@ def start_agent(cwd, prompt, where, terminal_app=None, title="Agent", prs=None):
     return True, "Agent started.", record
 
 
+def adopt_agent(session_id, cwd, title):
+    """Take an ended session into the board, so it resumes in the right panel instead of replacing the board."""
+    if not cwd or not os.path.isdir(cwd):
+        return None
+    record = {
+        "sessionId": session_id, "cwd": str(cwd), "prompt": None, "where": BACKGROUND, "title": title,
+        "branch": read_env(Path(cwd) / ".worktree.env").get("BRANCH"), "prs": [], "createdAt": datetime.now(timezone.utc).isoformat(),
+    }
+    _registry.change(lambda data: data.__setitem__(session_id, record))
+    return resume_agent(session_id)
+
+
 def resume_agent(session_id):
     record = board_agent(session_id)
     if not record:

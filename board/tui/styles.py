@@ -4,8 +4,8 @@ APP_CSS = f"""
 Screen {{ background: #0d1117; }}
 #top {{ height: 3; padding: 1 2 0 2; }}
 #main {{ height: 1fr; }}
-#list {{ width: 3fr; padding: 0 1 0 2; scrollbar-size-vertical: 1; }}
-#side {{ width: 2fr; min-width: 40; background: #161b22; border-left: tall #21262d; }}
+#list {{ width: 1fr; padding: 0 1 0 2; scrollbar-size-vertical: 1; }}
+#side {{ width: 1fr; min-width: 40; background: #161b22; border-left: tall #21262d; }}
 #preview {{ padding: 1 2; }}
 #terminal-header {{ height: 2; padding: 0 2; margin: 1 0 0 0; }}
 #terminal-view {{ height: 1fr; margin: 1 1 0 2; }}
