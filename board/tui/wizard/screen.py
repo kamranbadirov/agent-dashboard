@@ -25,6 +25,7 @@ VERBS = {"new": "Create platform", "review": "Create platform", "clean": "Delete
 RUNNING = {"new": "Creating platform", "review": "Creating platform", "clean": "Cleaning up", "backend": "Running", "browser": "Running"}
 AFTER_QUESTIONS = {"new": 3, "review": 3, "clean": 2, "backend": 2, "browser": 2}  # summary, progress, and the ready screen for flows that have one
 TICK_SECONDS = 0.4
+RECHECK_SECONDS = 5
 
 
 def button(spec):
@@ -243,8 +244,14 @@ class WizardScreen(ModalScreen):
         if self.phase != "summary":
             return
         self.checks_ok = all(r["ok"] for r in results)
-        self.query_one(SummaryView).show_checks(results)
+        self.query_one(SummaryView).show_checks(results, RECHECK_SECONDS)
         self.update_create()
+        if not self.checks_ok:
+            self.set_timer(RECHECK_SECONDS, self.recheck_failed)
+
+    def recheck_failed(self):
+        if self.phase == "summary" and not self.checks_ok:
+            self.run_checks()
 
     def update_create(self):
         summary = self.query_one(SummaryView)
