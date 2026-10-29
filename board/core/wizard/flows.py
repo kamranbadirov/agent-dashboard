@@ -55,10 +55,13 @@ def pr_options(answers):
                    f"{p['branch']} · {p['author']}") for p in prs]
 
 
+PR_DETAIL = {"finished": "PRs merged or closed, safe to clean", "open": "PR open", "none": "no PR"}
+
+
 def platform_options(answers):
     out = []
-    for p in sorted(platforms(), key=lambda p: p["modified"]):
-        detail = "own backend" if p["isolated"] else "shared backend"
+    for p in sorted(platforms(), key=lambda p: (p["prs"] != "finished", p["modified"])):
+        detail = PR_DETAIL[p["prs"]] + " · " + ("own backend" if p["isolated"] else "shared backend")
         if p["dirty"]:
             detail += " · uncommitted in " + ", ".join(p["dirty"])
         out.append(Option(p["name"], p["name"], detail, badge="uncommitted" if p["dirty"] else ""))

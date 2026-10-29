@@ -37,6 +37,7 @@ class Board(App):
         Binding("down,j,right,l", "move(1)", "Move", show=False),
         Binding("up,k,left,h", "move(-1)", "Move", show=False),
         Binding("w", "wizard", "New work"),
+        Binding("c", "clean_platforms", "Clean up"),
         Binding("enter", "resume", "Resume"),
         Binding("o", "open_session", "Open"),
         Binding("p", "open_pr", "PR"),
@@ -269,6 +270,9 @@ class Board(App):
             self.refresh_jobs()
 
         self.push_screen(WizardScreen(), closed)
+
+    def action_clean_platforms(self):
+        self.push_screen(WizardScreen(start="clean"), lambda result: self.refresh_jobs())
 
     def focus_agent(self):
         card = next((c for c in self.cards() if c.session["sessionId"] == self.focused_id), None)

@@ -61,6 +61,7 @@ python3 server.py
 | `p` | Open the first PR |
 | `t` | Open the first Linear ticket |
 | `x` | Close the selected agent, or remove an ended one |
+| `c` | Clean up platforms. Platforms whose PRs are all merged or closed come first. |
 | `e` | Show or hide inactive agents |
 | `r` | Refresh now |
 | `q` | Quit |

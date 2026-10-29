@@ -43,8 +43,9 @@ class WizardScreen(ModalScreen):
     ]
     DEFAULT_CSS = WIZARD_CSS
 
-    def __init__(self):
+    def __init__(self, start=None):
         super().__init__()
+        self.start = start
         self.flow = None
         self.answers = {}
         self.position = -1
@@ -70,7 +71,11 @@ class WizardScreen(ModalScreen):
     def on_mount(self):
         self.set_interval(TICK_SECONDS, self.on_tick)
         self.fit_body()
-        self.show_question(MENU)
+        if self.start:
+            self.flow = FLOWS[self.start]
+            self.move(1)
+        else:
+            self.show_question(MENU)
 
     def on_resize(self):
         self.fit_body()
