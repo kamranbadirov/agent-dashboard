@@ -163,6 +163,23 @@ def reviewed_prs():
     return data
 
 
+def branch_prs(repo, branch):
+    key = f"__branch__{repo}@{branch}"
+    now = time.time()
+    with _pr_lock:
+        cached = _pr_cache.get(key)
+        if cached and now - cached[0] < PR_CACHE_SECONDS:
+            return cached[1]
+    data = gh_json(
+        ["pr", "list", "--repo", f"pheedloop/{repo}", "--head", branch, "--state", "all", "--json", "number,state"]
+    )
+    if data is None:
+        return []
+    with _pr_lock:
+        _pr_cache[key] = (now, data, None)
+    return data
+
+
 _me = None
 
 

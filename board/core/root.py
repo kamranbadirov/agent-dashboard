@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .config import ROOT_REPO
+from .github import branch_prs
 
 ENV_LINE_RE = re.compile(r"^(\w+)='(.*)'$")
 ARRAY_RE = r"^{name}=\(([^)]*)\)"
@@ -47,6 +48,11 @@ def platform_urls(slug, isolated):
     return urls
 
 
+def browser_port():
+    out = subprocess.run(["bash", "scripts/browser-host.sh", "port"], cwd=root_dir(), capture_output=True, text=True)
+    return out.stdout.strip() if out.returncode == 0 else ""
+
+
 def platform_dir(slug):
     return root_dir().parent / f"platform-{slug}"
 
@@ -75,6 +81,23 @@ def dirty_repos(platform):
     return dirty
 
 
+def current_branch(path):
+    out = subprocess.run(["git", "-C", str(path), "branch", "--show-current"], capture_output=True, text=True)
+    return out.stdout.strip()
+
+
+def pr_state(platform):
+    prs = []
+    for repo in repo_names() + repo_names(mobile=True):
+        path = platform / repo
+        branch = current_branch(path) if path.exists() else ""
+        if branch:
+            prs += branch_prs(repo, branch)
+    if not prs:
+        return "none"
+    return "open" if any(p["state"] == "OPEN" for p in prs) else "finished"
+
+
 def describe_platform(path):
     env = read_env(path / ".worktree.env")
     return {
@@ -84,6 +107,7 @@ def describe_platform(path):
         "branch": env.get("BRANCH"),
         "isolated": env.get("PIKACHU_MODE") == "isolated",
         "dirty": dirty_repos(path),
+        "prs": pr_state(path),
         "modified": path.stat().st_mtime if path.exists() else 0,
     }
 

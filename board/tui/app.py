@@ -1,5 +1,4 @@
 import json
-import os
 import subprocess
 from datetime import datetime
 
@@ -37,6 +36,7 @@ class Board(App):
         Binding("down,j,right,l", "move(1)", "Move", show=False),
         Binding("up,k,left,h", "move(-1)", "Move", show=False),
         Binding("w", "wizard", "New work"),
+        Binding("c", "clean_platforms", "Clean up"),
         Binding("enter", "resume", "Resume"),
         Binding("o", "open_session", "Open"),
         Binding("p", "open_pr", "PR"),
@@ -56,7 +56,6 @@ class Board(App):
         self.show_inactive = False
         self.status_filter = None
         self.focused_id = None
-        self.resume_target = None
 
     def compose(self) -> ComposeResult:
         yield TopBar(id="top")
@@ -92,7 +91,7 @@ class Board(App):
     def listed(self):
         started = [self.with_record(s) for s in (self.state or {}).get("sessions", [])]
         sessions = [job_session(j) for j in jobs.listed()] + started
-        return [s for s in sessions if s["status"] != "ended" or self.show_inactive]
+        return [s for s in sessions if s["status"] not in ("ended", "done") or self.show_inactive]
 
     def visible(self):
         return [s for s in self.listed() if self.status_filter in (None, s["status"])]
@@ -270,6 +269,9 @@ class Board(App):
 
         self.push_screen(WizardScreen(), closed)
 
+    def action_clean_platforms(self):
+        self.push_screen(WizardScreen(start="clean"), lambda result: self.refresh_jobs())
+
     def focus_agent(self):
         card = next((c for c in self.cards() if c.session["sessionId"] == self.focused_id), None)
         if card:
@@ -346,18 +348,16 @@ class Board(App):
         if s["alive"]:
             self.notify(f"{s.get('name') or 'This agent'} is still running. Press o to open it.")
             return
-        self.resume_target = s
-        self.exit()
+        if not agents.adopt_agent(s["sessionId"], s.get("cwd"), s["title"]):
+            self.notify("This session's folder no longer exists, so it cannot resume.", severity="error")
+            return
+        self.show_side(s)
+        self.query_one(AgentTerminal).focus_terminal()
 
 
 def main():
     app = Board()
     app.run()
-    s = app.resume_target
-    if s:
-        if s.get("cwd") and os.path.isdir(s["cwd"]):
-            os.chdir(s["cwd"])
-        os.execvp("claude", ["claude", "--resume", s["sessionId"]])
 
 
 if __name__ == "__main__":
