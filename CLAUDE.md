@@ -4,7 +4,7 @@ A local board for Claude Code agents. It reads `~/.claude/` session files, asks 
 
 ## Commands
 
-- `make setup`: install gh, the icon font and Python 3.11, create `.venv`, install `requirements.txt`
+- `make setup`: install gh, tmux, the icon font and Python 3.11, create `.venv`, install `requirements.txt`
 - `make tui` (or `python3 server.py`): terminal board
 - `python3 server.py --json`: print the state once, useful to check a change in `core/`
 - `.venv/bin/python -m pyflakes board`: lint (install pyflakes in the venv first)
@@ -26,15 +26,16 @@ board/
     assets.py        repo images found in board/assets
     state.py         build_state(), the one function the board calls
     notify.py        desktop notifications for new commits and for agents that need you
-    cache.py         ring buffer, JSON file saved in batches, batched log appender
+    cache.py         JSON file saved in batches
     root.py          find the root checkout, list its platforms
     jobs.py          run root's scripts in a thread, keep their steps and output
-    ptyhost.py       a program in a pseudo-terminal, with its output saved
+    ptyhost.py       the tmux host: start, capture, resize and attach board agents
+    tmux.conf        the board's own tmux config; the user's ~/.tmux.conf never applies
     agents.py        start and resume agents: in the board or in a terminal app
     wizard/          the work wizard without UI: flows.py (questions), commands.py, preflight.py, prs.py, run.py
   tui/               terminal board (Textual)
     wizard/          the wizard screen and its inputs; it only renders core/wizard/flows.py
-    widgets/terminal.py   the typeable agent terminal in the right panel
+    widgets/terminal.py   the read-only agent preview in the right panel; a key attaches to tmux
   assets/            repo images
 ```
 
@@ -47,8 +48,15 @@ board/
 - Terminal layout comes in whole rows and columns. Spacing in pixels (such as 8px) can only be matched sideways, not vertically.
 - `titles.json`, `dismissed.json`, `agents.json` and `terminals/` are local state and are gitignored.
 - The work wizard (key `w` in the terminal board) runs the scripts of the root checkout (`ROOT_REPO`; when it is not set, the dashboard's parent folder if that is a root checkout, else `~/Documents/root`). Questions are data in `core/wizard/flows.py`; to add or change a question, change it there, not in `tui/`. Answers reach root only through its environment variable overrides (`BRANCH`, `BACKEND`, `PRS`, `PLATFORM`, ...). Commands are argv lists, never shell strings. The repo list is read from root's `scripts/_lib.sh`, not copied.
-- The wizard and the agent terminal use `pyte` (pinned) to draw the terminal. `AGENT_COMMAND` replaces `claude`, which is how to test with a fake agent.
-- Writes are cheap by design: terminal output is merged in memory and appended to disk in batches, and `agents.json` is saved once after a quiet moment through a temp file and rename (`core/cache.py`). Do not write to disk per chunk or per keystroke.
+- tmux hosts the agents that the board starts. Each agent is one tmux session on the private socket `agent-board`. The board starts tmux with `core/tmux.conf`.
+- A tmux session outlives the board. After a board restart, an agent with a live tmux session is still alive. The board does not start it again.
+- The right panel only shows the agent. It reads `tmux capture-pane` every 250 ms in a thread, and only while the panel shows.
+- Enter or a printable key on the panel suspends the board and runs `tmux attach`. The user's own terminal draws the agent. `ctrl+]` detaches and goes back to the board.
+- A key on an ended agent starts `claude --resume` in tmux and attaches at once.
+- `tmux pipe-pane` appends the agent's output to `terminals/<id>.log`. This `pipe-pane` command string is the one shell string, and `shlex.quote` quotes its path.
+- If `tmux` is missing, the panel shows one error. The board does not crash.
+- `AGENT_COMMAND` replaces `claude`. Use it to test with a fake agent.
+- Writes are cheap by design: tmux appends agent output to the log, and `agents.json` is saved once after a quiet moment through a temp file and rename (`core/cache.py`). Do not write to disk per chunk or per keystroke.
 
 ## Design
 

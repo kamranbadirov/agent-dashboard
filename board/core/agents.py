@@ -77,7 +77,9 @@ def start_agent(cwd, prompt, where, terminal_app=None, title="Agent", prs=None):
     }
     argv = agent_argv(record, resume=False)
     if where == BACKGROUND:
-        ptyhost.spawn(record["sessionId"], argv, record["cwd"])
+        ok, message = ptyhost.spawn(record["sessionId"], argv, record["cwd"])
+        if not ok:
+            return False, message, None
     elif where == TERMINAL:
         try:
             result = launch_in_terminal(record["sessionId"], record["cwd"], argv, terminal_app or "Terminal")
@@ -93,7 +95,7 @@ def start_agent(cwd, prompt, where, terminal_app=None, title="Agent", prs=None):
 
 def adopt_agent(session_id, cwd, title):
     if not cwd or not os.path.isdir(cwd):
-        return None
+        return False, "This session's folder no longer exists, so it cannot resume."
     record = {
         "sessionId": session_id, "cwd": str(cwd), "prompt": None, "where": BACKGROUND, "title": title,
         "branch": read_env(Path(cwd) / ".worktree.env").get("BRANCH"), "prs": [], "createdAt": datetime.now(timezone.utc).isoformat(),
@@ -105,5 +107,5 @@ def adopt_agent(session_id, cwd, title):
 def resume_agent(session_id):
     record = board_agent(session_id)
     if not record:
-        return None
+        return False, "This agent was not started by the board."
     return ptyhost.spawn(session_id, agent_argv(record, resume=True), record["cwd"])

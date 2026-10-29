@@ -352,8 +352,9 @@ class Board(App):
         if s["alive"]:
             self.notify(f"{s.get('name') or 'This agent'} is still running. Press o to open it.")
             return
-        if not agents.adopt_agent(s["sessionId"], s.get("cwd"), s["title"]):
-            self.notify("This session's folder no longer exists, so it cannot resume.", severity="error")
+        ok, message = agents.adopt_agent(s["sessionId"], s.get("cwd"), s["title"])
+        if not ok:
+            self.notify(message, severity="error")
             return
         self.show_side(s)
         self.query_one(AgentTerminal).focus_terminal()

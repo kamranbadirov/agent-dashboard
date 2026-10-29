@@ -1,99 +1,79 @@
-import fcntl
 import os
-import pty
-import struct
+import shlex
+import shutil
 import subprocess
-import termios
-import threading
+from pathlib import Path
 
-from .cache import BatchedAppender, RingBuffer
-from .config import TERMINAL_BUFFER_BYTES, TERMINALS_DIR
+from .config import TERMINALS_DIR
 
-READ_BYTES = 65536
-_sessions = {}
+SOCKET = "agent-board"
+CONFIG = Path(__file__).with_name("tmux.conf")
+MISSING = "tmux is not installed. Run brew install tmux, then start the board again."
+_size = [45, 160]
+_sizes = {}
+
+
+def available():
+    return shutil.which("tmux") is not None
+
+
+def tmux_argv(*args):
+    return ["tmux", "-L", SOCKET, "-f", str(CONFIG), *args]
+
+
+def outside_tmux():
+    return {k: v for k, v in os.environ.items() if k != "TMUX"}
+
+
+def tmux(*args):
+    return subprocess.run(tmux_argv(*args), capture_output=True, text=True, env=outside_tmux())
 
 
 def log_path(key):
     return TERMINALS_DIR / f"{key}.log"
 
 
-def make_controlling_tty():
-    fcntl.ioctl(0, termios.TIOCSCTTY, 0)
-
-
-class PtySession:
-    """One program running in a pseudo-terminal. Output is kept in memory for the live view
-    and appended to a log file, so it can be shown again after the board restarts."""
-
-    def __init__(self, key, argv, cwd, rows=30, cols=100):
-        self.key = key
-        self.closed = False  # the master end is closed once the program has exited
-        self.buffer = RingBuffer(TERMINAL_BUFFER_BYTES)
-        self.master, slave = pty.openpty()
-        self.resize(rows, cols)
-        env = {**os.environ, "TERM": "xterm-256color", "COLUMNS": str(cols), "LINES": str(rows)}
-        self.process = subprocess.Popen(
-            argv, cwd=cwd, env=env, stdin=slave, stdout=slave, stderr=slave,
-            start_new_session=True, preexec_fn=make_controlling_tty,
-        )
-        os.close(slave)
-        self.log = BatchedAppender(log_path(key))
-        threading.Thread(target=self.pump, daemon=True).start()
-
-    def pump(self):
-        while True:
-            try:
-                chunk = os.read(self.master, READ_BYTES)
-            except OSError:
-                break
-            if not chunk:
-                break
-            self.buffer.write(chunk)
-            self.log.write(chunk)
-        self.process.wait()
-        self.log.close()
-        self.closed = True
-        os.close(self.master)
-
-    @property
-    def alive(self):
-        return self.process.poll() is None
-
-    def write(self, data):
-        if self.alive and not self.closed:
-            try:
-                os.write(self.master, data)
-            except OSError:
-                pass
-
-    def resize(self, rows, cols):
-        if self.closed:
-            return
-        try:
-            fcntl.ioctl(self.master, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
-        except OSError:
-            pass  # the program exited and the pump closed the master just now
-
-    def stop(self):
-        if self.alive:
-            self.process.terminate()
+def set_size(rows, cols):
+    _size[:] = [rows, cols]
 
 
 def spawn(key, argv, cwd):
-    session = PtySession(key, argv, cwd)
-    _sessions[key] = session
-    return session
+    if not available():
+        return False, MISSING
+    rows, cols = _size
+    result = tmux("new-session", "-d", "-s", key, "-x", str(cols), "-y", str(rows), "-c", str(cwd), "--", *argv)
+    if result.returncode != 0:
+        return False, result.stderr.strip() or "Could not start the agent in tmux."
+    _sizes[key] = (rows, cols)
+    TERMINALS_DIR.mkdir(parents=True, exist_ok=True)
+    tmux("pipe-pane", "-o", "-t", f"={key}:", f"cat >> {shlex.quote(str(log_path(key)))}")
+    return True, "Agent started."
 
 
-def get(key):
-    return _sessions.get(key)
+def alive(key):
+    return available() and tmux("has-session", "-t", f"={key}").returncode == 0
 
 
-def history(key):
-    try:
-        with open(log_path(key), "rb") as f:
-            f.seek(0, os.SEEK_END)
-            f.seek(max(0, f.tell() - TERMINAL_BUFFER_BYTES))
-            return f.read()
-    except OSError:
-        return b""
+def resize(key, rows, cols):
+    if _sizes.get(key) == (rows, cols):
+        return
+    if tmux("resize-window", "-t", f"={key}:", "-x", str(cols), "-y", str(rows)).returncode == 0:
+        _sizes[key] = (rows, cols)
+
+
+def capture(key, rows, cols):
+    if not available():
+        return None
+    resize(key, rows, cols)
+    result = tmux("capture-pane", "-p", "-e", "-t", f"={key}:")
+    return result.stdout.rstrip("\n") if result.returncode == 0 else None
+
+
+def send_text(key, text):
+    tmux("send-keys", "-t", f"={key}:", "-l", text)
+
+
+def attach(key):
+    tmux("set-option", "-w", "-u", "-t", f"={key}:", "window-size")
+    _sizes.pop(key, None)
+    return subprocess.run(tmux_argv("attach-session", "-t", f"={key}"), env=outside_tmux()).returncode

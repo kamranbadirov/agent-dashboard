@@ -35,8 +35,6 @@ AGENT_COMMAND = os.environ.get("AGENT_COMMAND", "claude")
 INFER_MODEL = os.environ.get("INFER_MODEL", "haiku")
 AGENTS_FILE = ROOT / "agents.json"
 TERMINALS_DIR = ROOT / "terminals"
-TERMINAL_BUFFER_BYTES = 256_000
-TERMINAL_LOG_FLUSH_SECONDS = 2
 JSON_WRITE_DELAY_SECONDS = 0.5
 
 TICKET_RE = re.compile(r"\b([A-Z]{2,6}-\d{1,5})\b")
