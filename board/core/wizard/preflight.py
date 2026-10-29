@@ -1,3 +1,4 @@
+import os
 import shutil
 import socket
 import subprocess
@@ -46,7 +47,9 @@ def has_docker():
 
 
 def has_aws():
-    return check("AWS login", succeeds(["aws", "configure", "export-credentials"]), "aws sso login")
+    profile = os.environ.get("AWS_PROFILE", "default")
+    return check("AWS login", succeeds(["aws", "configure", "export-credentials", "--profile", profile]),
+                 f"aws sso login --profile {profile}")
 
 
 def has_shared_database():
@@ -61,7 +64,9 @@ def folder_free(slug):
 
 
 def checks_for(flow, answers):
-    if flow == "clean":
+    if flow == "backend":
+        return [has_docker]
+    if flow in ("clean", "browser"):
         return []
     slug = slugify(answers["branch"]) if flow == "new" else review_slug(answers)
     checks = [has_gum, has_proxy, folder_free(slug)]

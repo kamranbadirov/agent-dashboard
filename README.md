@@ -56,13 +56,14 @@ python3 server.py
 | Key | Action |
 |-----|--------|
 | `↑` `↓` / `j` `k` | Move between agents |
-| `Enter` | Resume the selected agent with `claude --resume` |
+| `Enter` | Resume the selected agent in the right half of the board. `ctrl+]` goes back to the tiles. |
 | `o` | Open the session on claude.ai |
 | `p` | Open the first PR |
 | `t` | Open the first Linear ticket |
 | `x` | Close the selected agent, or remove an ended one |
 | `c` | Clean up platforms. Platforms whose PRs are all merged or closed come first. |
-| `e` | Show or hide inactive agents |
+| `w` | Open the work wizard: new work, PR review, clean up, the shared backend and the shared browser. |
+| `e` | Show or hide inactive and done agents |
 | `r` | Refresh now |
 | `q` | Quit |
 
