@@ -35,6 +35,7 @@ class Board(App):
     BINDINGS = [
         Binding("down,j,right,l", "move(1)", "Move", show=False),
         Binding("up,k,left,h", "move(-1)", "Move", show=False),
+        Binding("s", "start_ticket", "Start ticket"),
         Binding("w", "wizard", "New work"),
         Binding("c", "clean_platforms", "Clean up"),
         Binding("enter", "resume", "Resume"),
@@ -257,17 +258,20 @@ class Board(App):
         elif s:
             self.notify("This session has no ticket.")
 
-    def action_wizard(self):
-        def closed(result):
-            job, action = result if isinstance(result, tuple) else (result, None)
-            if job and job.state == "running":
-                self.notify(f"Setting up {job.label}. Its tile shows the progress.")
-            if action == "open_agent" and job.agent:
-                self.focused_id = job.agent["sessionId"]
-                self.notify("The agent's tile appears as soon as it has started." if not self.focus_agent() else "Agent opened.")
-            self.refresh_jobs()
+    def wizard_closed(self, result):
+        job, action = result if isinstance(result, tuple) else (result, None)
+        if job and job.state == "running":
+            self.notify(f"Setting up {job.label}. Its tile shows the progress.")
+        if action == "open_agent" and job.agent:
+            self.focused_id = job.agent["sessionId"]
+            self.notify("The agent's tile appears as soon as it has started." if not self.focus_agent() else "Agent opened.")
+        self.refresh_jobs()
 
-        self.push_screen(WizardScreen(), closed)
+    def action_wizard(self):
+        self.push_screen(WizardScreen(), self.wizard_closed)
+
+    def action_start_ticket(self):
+        self.push_screen(WizardScreen(start="ticket"), self.wizard_closed)
 
     def action_clean_platforms(self):
         self.push_screen(WizardScreen(start="clean"), lambda result: self.refresh_jobs())

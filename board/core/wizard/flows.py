@@ -1,8 +1,10 @@
 import re
 import subprocess
+from dataclasses import replace
 
 from ..agents import installed_terminals
 from ..root import browser_port, platform_dir, platform_urls, platforms, repo_names, slugify
+from .infer import infer
 from .model import Flow, Option, Question
 from .prs import search
 
@@ -125,6 +127,19 @@ NEW_WORK = Flow("new", "Start new work", "New branch, a worktree of every repo, 
     TERMINAL_APP,
 ])
 
+def infer_ticket(answers):
+    guess = infer(answers["ticket"])
+    return {"branch": guess["branch"], "backend": guess["backend"], "mobile": guess["mobile"], "seed": "no",
+            "agent": "implement", "where": "background", "_why": guess["why"]}
+
+
+TICKET = Flow("ticket", "Work on a ticket", "Give the ticket ID. Claude reads it and fills in the rest.",
+              "make new · about 3 to 6 min", [
+    Question("ticket", "text", "Which ticket?", "Claude reads it in Linear and picks the branch and the backend.",
+             label="Ticket ID", hint="For example DAT-593.", validate=check_ticket),
+    *[replace(q, inferred=True) for q in NEW_WORK.questions],
+], infer=infer_ticket)
+
 REVIEW = Flow("review", "Review pull requests", "Check out PR branches by ticket or PR number and run the app.",
               "make review · about 3 to 6 min", [
     Question("find", "choice", "Which pull requests?", "Search by Linear ticket, or name the PRs yourself.", [
@@ -161,7 +176,7 @@ BROWSER = Flow("browser", "Shared browser", "The Chrome window that QA agents at
     Question("action", "choice", "What should the shared browser do?", "", browser_options),
 ])
 
-FLOWS = {f.key: f for f in (NEW_WORK, REVIEW, CLEAN, BACKEND_FLOW, BROWSER)}
+FLOWS = {f.key: f for f in (TICKET, NEW_WORK, REVIEW, CLEAN, BACKEND_FLOW, BROWSER)}
 
 
 SHORT = {"branch": "Branch", "backend": "Backend", "mobile": "Mobile apps", "seed": "Demo data", "agent": "Agent",

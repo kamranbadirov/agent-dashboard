@@ -5,7 +5,7 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 from ..root import lib_value, platform_dir, slugify
-from .commands import review_slug
+from .commands import NEW_FLOWS, review_slug
 
 PROXY_PORT = 443
 
@@ -68,7 +68,7 @@ def checks_for(flow, answers):
         return [has_docker]
     if flow in ("clean", "browser"):
         return []
-    slug = slugify(answers["branch"]) if flow == "new" else review_slug(answers)
+    slug = slugify(answers["branch"]) if flow in NEW_FLOWS else review_slug(answers)
     checks = [has_gum, has_proxy, folder_free(slug)]
     if flow == "review":
         checks.append(has_gh_login)

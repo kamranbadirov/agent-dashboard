@@ -9,7 +9,7 @@ from ...core import agents
 from ...core.jobs import Busy
 from ...core.root import RootMissing
 from ...core.wizard import preflight
-from ...core.wizard.commands import PLATFORM_FLOWS, build
+from ...core.wizard.commands import NEW_FLOWS, PLATFORM_FLOWS, build
 from ...core.wizard.flows import FLOWS
 from ...core.wizard.model import Option, Question, options_for
 from ...core.wizard.run import launch
@@ -21,9 +21,9 @@ from .views import ProgressView, ReadyView, SummaryView
 
 MENU = Question("flow", "choice", "What do you want to do?", "Pick one. You can cancel at any step.",
                 [Option(f.key, f.label, f.detail, tag=f.tag) for f in FLOWS.values()])
-VERBS = {"new": "Create platform", "review": "Create platform", "clean": "Delete", "backend": "Run", "browser": "Run"}
-RUNNING = {"new": "Creating platform", "review": "Creating platform", "clean": "Cleaning up", "backend": "Running", "browser": "Running"}
-AFTER_QUESTIONS = {"new": 3, "review": 3, "clean": 2, "backend": 2, "browser": 2}  # summary, progress, and the ready screen for flows that have one
+VERBS = {"ticket": "Create platform", "new": "Create platform", "review": "Create platform", "clean": "Delete", "backend": "Run", "browser": "Run"}
+RUNNING = {"ticket": "Creating platform", "new": "Creating platform", "review": "Creating platform", "clean": "Cleaning up", "backend": "Running", "browser": "Running"}
+AFTER_QUESTIONS = {"ticket": 3, "new": 3, "review": 3, "clean": 2, "backend": 2, "browser": 2}  # summary, progress, and the ready screen for flows that have one
 TICK_SECONDS = 0.4
 RECHECK_SECONDS = 5
 
@@ -117,7 +117,10 @@ class WizardScreen(ModalScreen):
         return self.flow.questions
 
     def is_asked(self, question):
-        return question.when is None or question.when(self.answers)
+        return not question.inferred and (question.when is None or question.when(self.answers))
+
+    def is_shown(self, question):
+        return self.is_asked(question) or (question.inferred and (question.when is None or question.when(self.answers)))
 
     def asked_count(self):
         return len([q for q in self.questions() if self.is_asked(q)])
@@ -137,13 +140,13 @@ class WizardScreen(ModalScreen):
             self.flow, self.position = None, -1
             self.show_question(MENU)
         elif self.position >= len(self.questions()):
-            self.show_summary()
+            self.infer_then_summary()
         else:
             self.show_question(self.questions()[self.position])
 
     def show_question(self, question):
         self.phase, self.question = "question", question
-        step, total = self.step_of() if self.flow else (None, None)
+        step, total = self.step_of() if self.flow and self.is_asked(question) else (None, None)
         self.head(question.title, question.help, step, total)
         self.foot([("Back" if self.flow else "Cancel", "back", "ghost")],
                   [("Next" if self.flow else "Choose", "next", "primary", {"disabled": True})])
@@ -215,7 +218,7 @@ class WizardScreen(ModalScreen):
     def recap_rows(self):
         rows = []
         for question in self.questions():
-            if not self.is_asked(question) or question.id not in self.answers:
+            if not self.is_shown(question) or question.id not in self.answers:
                 continue
             value = self.answers[question.id]
             names = {o.value: o for o in self.loaded.get(question.id) or []}
@@ -224,9 +227,30 @@ class WizardScreen(ModalScreen):
                 rows.append((question.short if i == 0 else "", self.label_for(question, item), question.id if i == 0 else "", badge))
         return rows
 
+    def infer_then_summary(self):
+        if not self.flow.infer or self.answers.get("_inferred_for") == self.answers.get("ticket"):
+            self.show_summary()
+            return
+        self.phase = "inferring"
+        self.head(f"Reading {self.answers['ticket']}…", "Claude reads the ticket in Linear and picks the branch and the backend.")
+        self.body(Static(Text("This takes about 10 seconds.", style=MUTED)))
+        self.foot([("Back", "back", "ghost")], [])
+        self.run_infer(self.answers["ticket"])
+
+    @work(thread=True, exclusive=True)
+    def run_infer(self, ticket):
+        guess = self.flow.infer(self.answers)
+        self.app.call_from_thread(self.apply_infer, ticket, guess)
+
+    def apply_infer(self, ticket, guess):
+        if self.phase != "inferring" or self.answers.get("ticket") != ticket:
+            return
+        self.answers.update(guess, _inferred_for=ticket)
+        self.show_summary()
+
     def show_summary(self):
         self.phase, self.checks_ok = "summary", False
-        self.head(f"Ready to {VERBS[self.flow.key].split()[0].lower()}", self.flow.label,
+        self.head(f"Ready to {VERBS[self.flow.key].split()[0].lower()}", self.answers.get("_why") or self.flow.label,
                   *self.step_of(self.asked_count() + 1))
         word = self.flow.typed_confirm(self.answers) if self.flow.typed_confirm else None
         summary = SummaryView(self.recap_rows(), build(self.flow.key, self.answers)[0], word)
@@ -302,7 +326,7 @@ class WizardScreen(ModalScreen):
 
     def show_ready(self):
         self.phase = "ready"
-        self.head(f"{self.job.label} is ready", "All repos are on your branch." if self.flow.key == "new"
+        self.head(f"{self.job.label} is ready", "All repos are on your branch." if self.flow.key in NEW_FLOWS
                   else "Real PR branches are checked out, so a push goes to the PR.",
                   *self.step_of(self.asked_count() + 3))
         view = ReadyView()

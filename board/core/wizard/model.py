@@ -25,6 +25,7 @@ class Question:
     label: str = ""  # the caption above a text field
     hint: str = ""  # small help under a text field
     preview: Optional[Callable] = None  # function of (value, answers); returns (label, value) pairs for a text answer
+    inferred: bool = False
 
 
 @dataclass
@@ -35,6 +36,7 @@ class Flow:
     tag: str
     questions: list
     typed_confirm: Optional[Callable] = None  # function of the answers; the word to type before going ahead, or None
+    infer: Optional[Callable] = None
 
 
 def visible(questions, answers):
