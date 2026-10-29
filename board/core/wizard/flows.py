@@ -103,7 +103,6 @@ SEED = Question("seed", "choice", "Add demo data?", "Adds a QA event, an attende
 ], when=is_isolated)
 WHERE = Question("where", "choice", "Where should the agent run?", "You can move it later by resuming the session.", [
     Option("background", "In the board", "No window. Select its tile to see the terminal in the right panel."),
-    Option("cmux", "In cmux", "Opens a cmux workspace in the new platform."),
     Option("terminal", "In another terminal", "Opens the terminal app you pick."),
 ], when=wants_agent)
 TERMINAL_APP = Question("terminal_app", "choice", "Which terminal app?", "", terminal_options, when=in_terminal)

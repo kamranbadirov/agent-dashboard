@@ -9,7 +9,7 @@ from .parts import Btn, Callout, key_values
 
 SPINNER = "◐◓◑◒"
 LOG_LINES = 8
-PLACES = {"background": "in the board", "cmux": "in cmux", "terminal": "in a terminal"}
+PLACES = {"background": "in the board", "terminal": "in a terminal"}
 
 
 class RecapRow(Horizontal):

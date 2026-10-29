@@ -49,7 +49,7 @@ def progress_bar(fraction, width):
     return bar
 
 
-PLACES = {"background": "in the board", "cmux": "in cmux", "terminal": "in a terminal"}
+PLACES = {"background": "in the board", "terminal": "in a terminal"}
 
 
 def pr_stub(pr):

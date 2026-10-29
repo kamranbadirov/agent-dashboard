@@ -10,7 +10,7 @@ from .cache import JsonFile
 from .config import AGENT_COMMAND, AGENTS_FILE, TERMINALS_DIR
 from .root import read_env
 
-BACKGROUND, CMUX, TERMINAL = "background", "cmux", "terminal"
+BACKGROUND, TERMINAL = "background", "terminal"
 TERMINAL_APPS = {
     "Terminal": "/System/Applications/Utilities/Terminal.app",
     "iTerm": "/Applications/iTerm.app",
@@ -47,11 +47,6 @@ def agent_argv(record, resume):
     return argv + [record["prompt"]] if record["prompt"] else argv
 
 
-def launch_in_cmux(name, cwd, argv):
-    command = ["cmux", "new-workspace", "--name", name, "--cwd", cwd, "--command", shlex.join(argv)]
-    return subprocess.run(command, capture_output=True, text=True)
-
-
 def launch_in_terminal(key, cwd, argv, app):
     TERMINALS_DIR.mkdir(parents=True, exist_ok=True)
     script = TERMINALS_DIR / f"{key}.command"
@@ -60,23 +55,17 @@ def launch_in_terminal(key, cwd, argv, app):
     return subprocess.run(["open", "-a", app, str(script)], capture_output=True, text=True)
 
 
-def launch_elsewhere(key, name, cwd, argv, where, app):
-    if where == CMUX:
-        return launch_in_cmux(name, cwd, argv)
-    return launch_in_terminal(key, cwd, argv, app or "Terminal")
-
-
 def run_dev_servers(platform, where, app):
-    """`make run` in the platform. It needs a real terminal, so a board agent's owner gets cmux or a terminal app."""
-    place = where if where in (CMUX, TERMINAL) else (CMUX if os.path.exists("/Applications/cmux.app") else TERMINAL)
-    result = launch_elsewhere(f"run-{os.path.basename(platform)}", f"{os.path.basename(platform)} servers", platform,
-                              ["make", "run"], place, app)
+    try:
+        result = launch_in_terminal(f"run-{os.path.basename(platform)}", platform, ["make", "run"],
+                                    app if where == TERMINAL and app else "Terminal")
+    except OSError as e:
+        return False, f"Could not start the dev servers: {e}"
     return result.returncode == 0, result.stderr.strip() or "Started."
 
 
 def bring_forward(where, app):
-    name = "cmux" if where == CMUX else app
-    subprocess.run(["open", "-a", name], capture_output=True)
+    subprocess.run(["open", "-a", app or "Terminal"], capture_output=True)
 
 
 def start_agent(cwd, prompt, where, terminal_app=None, title="Agent", prs=None):
@@ -89,8 +78,11 @@ def start_agent(cwd, prompt, where, terminal_app=None, title="Agent", prs=None):
     argv = agent_argv(record, resume=False)
     if where == BACKGROUND:
         ptyhost.spawn(record["sessionId"], argv, record["cwd"])
-    elif where in (CMUX, TERMINAL):
-        result = launch_elsewhere(record["sessionId"], record["title"], record["cwd"], argv, where, terminal_app)
+    elif where == TERMINAL:
+        try:
+            result = launch_in_terminal(record["sessionId"], record["cwd"], argv, terminal_app or "Terminal")
+        except OSError as e:
+            return False, f"Could not open the terminal: {e}", None
     else:
         return False, "Unknown place to run the agent.", None
     if where != BACKGROUND and result.returncode != 0:
