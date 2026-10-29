@@ -64,7 +64,7 @@ class Job:
         for argv in command.steps:
             process = subprocess.Popen(
                 argv, cwd=command.cwd, env={**os.environ, **command.env}, stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace",
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", start_new_session=True,
             )
             self.read_output(process)
             if process.wait() != 0:

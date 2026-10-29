@@ -46,7 +46,7 @@ def review_slug(answers):
 
 def new_work(answers):
     slug = slugify(answers["branch"])
-    env = {"BRANCH": answers["branch"], "SLUG": slug, "MOBILE": answers["mobile"], **backend_env(answers)}
+    env = {"BRANCH": answers["branch"], "SLUG": slug, "MOBILE": answers["mobile"], "TOOLS": "no", **backend_env(answers)}
     return [Command(PREPARE + [["bash", "scripts/new.sh"]], env, str(root_dir()), slug, str(platform_dir(slug)))]
 
 
