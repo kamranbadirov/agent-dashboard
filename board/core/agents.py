@@ -100,7 +100,6 @@ def start_agent(cwd, prompt, where, terminal_app=None, title="Agent", prs=None):
 
 
 def adopt_agent(session_id, cwd, title):
-    """Take an ended session into the board, so it resumes in the right panel instead of replacing the board."""
     if not cwd or not os.path.isdir(cwd):
         return None
     record = {

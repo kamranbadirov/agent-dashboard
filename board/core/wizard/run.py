@@ -1,7 +1,7 @@
 from .. import agents, jobs
 from ..config import TICKET_RE
 from ..root import platform_urls
-from .commands import PLATFORM_FLOWS, build, expected_steps, review_prs
+from .commands import NEW_FLOWS, PLATFORM_FLOWS, build, expected_steps, review_prs
 
 
 def ticket_in(text):
@@ -10,7 +10,7 @@ def ticket_in(text):
 
 
 def agent_prompt(flow, answers):
-    if flow == "new":
+    if flow in NEW_FLOWS:
         return None if answers["agent"] == "none" else f"/devs:implement {ticket_in(answers['branch'])}".strip()
     if flow == "review":
         return f"/devs:code-review {answers.get('ticket', '')}".strip()
@@ -18,7 +18,7 @@ def agent_prompt(flow, answers):
 
 
 def job_label(flow, answers):
-    if flow == "new":
+    if flow in NEW_FLOWS:
         return answers["branch"]
     if flow == "review":
         return f"Review {answers.get('ticket') or ' '.join(answers['specs'].split())}"

@@ -61,6 +61,7 @@ python3 server.py
 | `p` | Open the first PR |
 | `t` | Open the first Linear ticket |
 | `x` | Close the selected agent, or remove an ended one |
+| `s` | Start work on a ticket. Type the ticket ID; Claude reads it in Linear and picks the branch, the backend and the mobile apps. You can change any of them before you start. |
 | `c` | Clean up platforms. Platforms whose PRs are all merged or closed come first. |
 | `w` | Open the work wizard: new work, PR review, clean up, the shared backend and the shared browser. |
 | `e` | Show or hide inactive and done agents |
@@ -100,6 +101,7 @@ Set these environment variables to change the defaults:
 | `ENDED_LOOKBACK_HOURS` | `72` | How far back to look for ended sessions. |
 | `STALE_HOURS` | `24` | Hours without activity before an agent becomes inactive. |
 | `NOTIFY_NEEDS_YOU` | `1` | Set to `0` to stop the desktop notification when an agent asks a question or waits for a tool approval. |
+| `INFER_MODEL` | `haiku` | The Claude model that reads a ticket when you press `s`. |
 | `AUTO_CLOSE_MERGED` | `1` | Set to `0` to stop the dashboard from closing idle agents whose PRs are all merged or closed. |
 
 Example:

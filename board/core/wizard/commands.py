@@ -3,7 +3,8 @@ from dataclasses import dataclass
 from ..root import platform_dir, root_dir, slugify
 
 PREPARE = [["make", "prepare"], ["make", "_source_repos"]]
-PLATFORM_FLOWS = ("new", "review")
+NEW_FLOWS = ("new", "ticket")
+PLATFORM_FLOWS = NEW_FLOWS + ("review",)
 BROWSER_HOST = ["bash", "scripts/browser-host.sh"]
 
 
@@ -74,7 +75,7 @@ def browser(answers):
     return [Command(steps, {"AGENT_BROWSER_HEADED": "1"}, str(root_dir()), "browser")]
 
 
-BUILDERS = {"new": new_work, "review": review, "clean": clean, "backend": backend, "browser": browser}
+BUILDERS = {"new": new_work, "ticket": new_work, "review": review, "clean": clean, "backend": backend, "browser": browser}
 
 
 def build(flow, answers):

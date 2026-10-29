@@ -32,6 +32,7 @@ def find_root_repo():
 
 ROOT_REPO = find_root_repo()
 AGENT_COMMAND = os.environ.get("AGENT_COMMAND", "claude")
+INFER_MODEL = os.environ.get("INFER_MODEL", "haiku")
 AGENTS_FILE = ROOT / "agents.json"
 TERMINALS_DIR = ROOT / "terminals"
 TERMINAL_BUFFER_BYTES = 256_000
