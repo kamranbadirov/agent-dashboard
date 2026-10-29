@@ -48,6 +48,11 @@ def platform_urls(slug, isolated):
     return urls
 
 
+def browser_port():
+    out = subprocess.run(["bash", "scripts/browser-host.sh", "port"], cwd=root_dir(), capture_output=True, text=True)
+    return out.stdout.strip() if out.returncode == 0 else ""
+
+
 def platform_dir(slug):
     return root_dir().parent / f"platform-{slug}"
 

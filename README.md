@@ -62,6 +62,7 @@ python3 server.py
 | `t` | Open the first Linear ticket |
 | `x` | Close the selected agent, or remove an ended one |
 | `c` | Clean up platforms. Platforms whose PRs are all merged or closed come first. |
+| `w` | Open the work wizard: new work, PR review, clean up, the shared backend and the shared browser. |
 | `e` | Show or hide inactive agents |
 | `r` | Refresh now |
 | `q` | Quit |

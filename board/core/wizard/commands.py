@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from ..root import platform_dir, root_dir, slugify
 
 PREPARE = [["make", "prepare"], ["make", "_source_repos"]]
+PLATFORM_FLOWS = ("new", "review")
+BROWSER_HOST = ["bash", "scripts/browser-host.sh"]
 
 
 @dataclass
@@ -60,7 +62,19 @@ def clean(answers):
     ]
 
 
-BUILDERS = {"new": new_work, "review": review, "clean": clean}
+def backend(answers):
+    if answers["action"] == "stop":
+        return [Command([["make", "backend-stop"]], {"YES": "1"}, str(root_dir()), "backend")]
+    return [Command([["make", "backend"]], {}, str(root_dir()), "backend")]
+
+
+def browser(answers):
+    steps = {"start": [BROWSER_HOST + ["start"]], "restart": [BROWSER_HOST + ["stop"], BROWSER_HOST + ["start"]],
+             "stop": [BROWSER_HOST + ["stop"]]}[answers["action"]]
+    return [Command(steps, {"AGENT_BROWSER_HEADED": "1"}, str(root_dir()), "browser")]
+
+
+BUILDERS = {"new": new_work, "review": review, "clean": clean, "backend": backend, "browser": browser}
 
 
 def build(flow, answers):
@@ -78,6 +92,8 @@ def expected_steps(flow, answers):
     Steps that root announces but this list lacks are added as they appear."""
     if flow == "clean":
         return ["Tearing down " + name for name in answers["platforms"]]
+    if flow not in PLATFORM_FLOWS:
+        return []
     first = ["Creating root worktree", "Fetching latest develop", "Adding child-repo worktrees"]
     if flow == "review":
         first = ["Searching open PRs", "Creating review platform", "Fetching PR branches", "Adding child-repo worktrees"]

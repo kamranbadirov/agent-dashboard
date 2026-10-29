@@ -2,7 +2,7 @@ import re
 import subprocess
 
 from ..agents import installed_terminals
-from ..root import platform_dir, platform_urls, platforms, repo_names, slugify
+from ..root import browser_port, platform_dir, platform_urls, platforms, repo_names, slugify
 from .model import Flow, Option, Question
 from .prs import search
 
@@ -73,6 +73,16 @@ def any_dirty(answers):
     return any(p["dirty"] for p in platforms() if p["name"] in chosen)
 
 
+def browser_options(answers):
+    port = browser_port()
+    if not port:
+        return [Option("start", "Start", "Opens a visible Chrome window. Log in to Sentry or GitHub there.")]
+    return [
+        Option("restart", "Restart with a window", f"It runs on port {port}. Restart it in a visible Chrome window."),
+        Option("stop", "Stop", f"Stops the browser on port {port}. Agents that use it lose their tabs."),
+    ]
+
+
 def terminal_options(answers):
     return [Option(name, name) for name in installed_terminals()]
 
@@ -138,12 +148,25 @@ CLEAN = Flow("clean", "Clean up a platform", "Delete a worktree, its docker stac
     Question("platforms", "multi", "Which platforms?", "Select one or more to delete.", platform_options, validate=check_picked),
 ], typed_confirm=lambda a: DELETE_WORD if any_dirty(a) else None)
 
-FLOWS = {f.key: f for f in (NEW_WORK, REVIEW, CLEAN)}
+BACKEND_FLOW = Flow("backend", "Shared backend", "Start or pause the pikachu backend that platforms share.",
+                    "make backend · make backend-stop", [
+    Question("action", "choice", "Start or stop the shared backend?", "", [
+        Option("start", "Start", "Starts or resumes it."),
+        Option("stop", "Stop", "Pauses it to free memory. The containers and the database stay."),
+    ]),
+])
+
+BROWSER = Flow("browser", "Shared browser", "The Chrome window that QA agents attach to.",
+               "make browser-host · make browser-host-stop", [
+    Question("action", "choice", "What should the shared browser do?", "", browser_options),
+])
+
+FLOWS = {f.key: f for f in (NEW_WORK, REVIEW, CLEAN, BACKEND_FLOW, BROWSER)}
 
 
 SHORT = {"branch": "Branch", "backend": "Backend", "mobile": "Mobile apps", "seed": "Demo data", "agent": "Agent",
          "where": "Runs", "terminal_app": "Terminal app", "find": "Search by", "ticket": "Ticket", "specs": "PRs",
-         "picked": "PRs", "platforms": "Platforms"}
+         "picked": "PRs", "platforms": "Platforms", "action": "Action"}
 for _flow in FLOWS.values():
     for _question in _flow.questions:
         _question.short = SHORT.get(_question.id, _question.title)

@@ -9,7 +9,7 @@ from ...core import agents
 from ...core.jobs import Busy
 from ...core.root import RootMissing
 from ...core.wizard import preflight
-from ...core.wizard.commands import build
+from ...core.wizard.commands import PLATFORM_FLOWS, build
 from ...core.wizard.flows import FLOWS
 from ...core.wizard.model import Option, Question, options_for
 from ...core.wizard.run import launch
@@ -21,8 +21,9 @@ from .views import ProgressView, ReadyView, SummaryView
 
 MENU = Question("flow", "choice", "What do you want to do?", "Pick one. You can cancel at any step.",
                 [Option(f.key, f.label, f.detail, tag=f.tag) for f in FLOWS.values()])
-VERBS = {"new": "Create platform", "review": "Create platform", "clean": "Delete"}
-AFTER_QUESTIONS = {"new": 3, "review": 3, "clean": 2}  # summary, progress, and the ready screen for flows that have one
+VERBS = {"new": "Create platform", "review": "Create platform", "clean": "Delete", "backend": "Run", "browser": "Run"}
+RUNNING = {"new": "Creating platform", "review": "Creating platform", "clean": "Cleaning up", "backend": "Running", "browser": "Running"}
+AFTER_QUESTIONS = {"new": 3, "review": 3, "clean": 2, "backend": 2, "browser": 2}  # summary, progress, and the ready screen for flows that have one
 TICK_SECONDS = 0.4
 
 
@@ -271,7 +272,7 @@ class WizardScreen(ModalScreen):
             self.notify(str(e), severity="error")
             return
         self.phase = "progress"
-        self.head(f"{'Cleaning up' if self.flow.key == 'clean' else 'Creating platform'}…", self.job.label,
+        self.head(f"{RUNNING[self.flow.key]}…", self.job.label,
                   *self.step_of(self.asked_count() + 2))
         self.body(ProgressView())
         self.foot([("Hide", "hide", "ghost")], [("Continue", "continue", "primary", {"id": "continue", "disabled": True})])
@@ -308,7 +309,7 @@ class WizardScreen(ModalScreen):
 
     def advance(self):
         if self.phase == "progress" and self.job.state == "done":
-            if self.flow.key == "clean":
+            if self.flow.key not in PLATFORM_FLOWS:
                 self.dismiss(self.job)
             else:
                 self.show_ready()
