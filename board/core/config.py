@@ -20,7 +20,17 @@ NOTIFIED_FILE = HOME / ".claude" / "agent-dashboard-notified.json"
 TAIL_BYTES = 600_000
 
 GITHUB_ORG = "pheedloop"
-ROOT_REPO = Path(os.environ.get("ROOT_REPO", HOME / "Documents" / "root"))
+
+
+def find_root_repo():
+    if os.environ.get("ROOT_REPO"):
+        return Path(os.environ["ROOT_REPO"])
+    if (ROOT.parent / "scripts" / "new.sh").is_file():
+        return ROOT.parent
+    return HOME / "Documents" / "root"
+
+
+ROOT_REPO = find_root_repo()
 AGENT_COMMAND = os.environ.get("AGENT_COMMAND", "claude")
 AGENTS_FILE = ROOT / "agents.json"
 TERMINALS_DIR = ROOT / "terminals"
