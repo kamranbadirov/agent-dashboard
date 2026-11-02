@@ -96,6 +96,19 @@ def read_env(path):
     return env
 
 
+def platform_of(path):
+    """The platform folder that holds path, or None."""
+    if not path:
+        return None
+    path = Path(path)
+    return next((p for p in (path, *path.parents) if p.name.startswith("platform-")), None)
+
+
+def platform_branch(path):
+    platform = platform_of(path)
+    return read_env(platform / ".worktree.env").get("BRANCH") if platform else None
+
+
 def dirty_repos(platform):
     dirty = []
     for repo in repo_names() + repo_names(mobile=True):

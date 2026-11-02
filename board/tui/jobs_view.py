@@ -16,7 +16,7 @@ def job_session(job):
         "sessionId": f"job:{job.id}", "name": None, "pid": None, "alive": False, "busy": False,
         "status": "your_move" if failed else "setting_up",
         "reasons": ["setup failed"] if failed else [],
-        "title": job.label, "tickets": [], "prs": [], "summary": None, "lastAssistant": None,
+        "title": job.label, "tickets": tickets_in(job.label)[:1], "prs": [], "summary": None, "lastAssistant": None,
         "lastUserPrompt": None, "pendingTool": None,
         "pendingQuestion": job.error if failed else job.current_step,
         "lastActivity": datetime.fromtimestamp(job.started, timezone.utc).isoformat(),
@@ -31,7 +31,7 @@ def proc_session(proc):
     return {
         "sessionId": f"proc:{proc['key']}", "name": "in the board", "pid": None, "alive": not proc["dead"], "busy": not proc["dead"],
         "status": status, "reasons": [f"exited with code {proc['exitCode']}"] if failed else [],
-        "title": proc["title"], "tickets": [], "prs": [], "summary": None, "lastAssistant": None,
+        "title": proc["title"], "tickets": proc.get("tickets", []), "prs": [], "summary": None, "lastAssistant": None,
         "lastUserPrompt": None, "pendingTool": None,
         "pendingQuestion": ("Finished." if not failed else f"Exited with code {proc['exitCode']}.") if proc["dead"] else "Running. Select it to see the output.",
         "lastActivity": datetime.fromtimestamp(proc["created"], timezone.utc).isoformat(),

@@ -9,8 +9,14 @@ Screen {{ background: #0d1117; }}
 #preview {{ padding: 1 2; }}
 #terminal-header {{ height: 2; padding: 0 2; margin: 1 0 0 0; }}
 #terminal-view {{ height: 1fr; margin: 1 1 0 2; }}
-#close-btn {{ width: auto; padding: 0 2; margin: 0 0 1 0; color: {INK}; background: {RED} 35%; }}
-#close-btn:hover {{ background: {RED}; }}
+#preview-head {{ height: auto; }}
+#preview-actions {{ height: auto; margin: 1 0 0 0; }}
+#preview-sessions {{ height: auto; margin: 1 0 0 0; }}
+#preview-sessions .section {{ margin: 0 0 0 0; }}
+.session-row {{ height: 1; padding: 0 1; }}
+.session-row:hover {{ background: {INK} 8%; }}
+.session-row.picked {{ background: {INK} 10%; }}
+#preview-body {{ height: auto; margin: 1 0 0 0; }}
 SectionHeader {{ margin: 1 0 0 0; height: 2; padding: 0 1; }}
 ItemGrid {{ grid-gutter: 1 2; height: auto; margin: 0 0 0 0; }}
 .tile {{ text-wrap: nowrap; height: 6; min-height: 6; padding: 0 1; }}

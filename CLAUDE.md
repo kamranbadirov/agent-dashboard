@@ -22,6 +22,7 @@ board/
     github.py        gh calls and the PR cache
     sessions.py      live and ended sessions, close an agent
     classify.py      which group an agent belongs to
+    group.py         one tile for each ticket: group sessions by their main ticket
     store.py         dismissed.json and titles.json
     assets.py        repo images found in board/assets
     state.py         build_state(), the one function the board calls
@@ -66,6 +67,10 @@ board/
 ## Design
 
 The tile follows "option C": a colored rail on the left, then title and time, the status, and a bottom row with the ticket chip, round repo logos and the ✎ ✕ buttons. Do not show PR numbers. Each logo opens its PR.
+
+A tile is a ticket. The sessions whose main ticket is the same share one tile (`core/group.py`). The main ticket is the first one found: the platform's branch, then the transcript, then the PR titles. The tile shows the most urgent status of its sessions and "N sessions", and it has no ✎ ✕. A session with no ticket keeps a tile of its own.
+
+The side panel starts with the title, then one quiet row of actions with their keys (`⏎ Open  p PR  t Ticket  n Rename  x Stop`). There is no red button. "Stop" reads "Dismiss" for an ended session. For a ticket, the panel lists its sessions as numbered rows. `1` to `9` or a click picks and opens one, and the actions apply to the picked session. Enter opens the lead session: the most urgent live one, else the newest.
 
 ## Git
 

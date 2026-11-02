@@ -7,8 +7,18 @@ from .classify import action_reasons, classify
 from .config import AUTO_CLOSE_MERGED, STARTING_GRACE_SECONDS
 from .github import fetch_pr, my_open_prs, reviewed_prs
 from .sessions import auto_close_merged, find_transcript, live_sessions, recent_ended
+from .root import platform_branch
 from .store import load_dismissed, load_titles
 from .transcript import parse_transcript, tickets_in
+
+
+def session_tickets(found, prs, cwd):
+    """The ticket of the platform the session runs in comes first, because it is the surest. Then the
+    tickets from the transcript, then those in the titles of its PRs. The first one is the main ticket."""
+    out = tickets_in(platform_branch(cwd) or "") + list(found)
+    for p in prs:
+        out += tickets_in(p.get("title") or "")
+    return list(dict.fromkeys(out))[:4]
 
 
 def starting_agents(known):
@@ -24,7 +34,9 @@ def starting_agents(known):
         out.append(
             {
                 "sessionId": sid, "name": None, "pid": None, "alive": False, "busy": starting, "status": "working" if starting else "ended",
-                "reasons": [], "title": record["title"], "tickets": [], "summary": None, "lastAssistant": None,
+                "reasons": [], "title": record["title"],
+                "tickets": session_tickets(tickets_in(f"{record['title']} {record.get('prompt') or ''}"), [], record["cwd"]),
+                "summary": None, "lastAssistant": None,
                 "lastUserPrompt": record.get("prompt"), "pendingTool": None, "pendingQuestion": None,
                 "lastActivity": record["createdAt"], "cwd": record["cwd"], "gitBranch": record.get("branch"),
                 "remoteUrl": None, "resumeCmd": f"claude --resume {sid}", "prs": [],
@@ -104,7 +116,7 @@ def build_state():
                 "status": status,
                 "reasons": reasons,
                 "title": info.get("title") or (info.get("firstPrompt") or "")[:80] or sid[:8],
-                "tickets": info["tickets"],
+                "tickets": session_tickets(info["tickets"], prs, info.get("cwd") or (meta or {}).get("cwd")),
                 "summary": info.get("summary"),
                 "lastAssistant": (info.get("lastAssistant") or "")[-600:],
                 "lastUserPrompt": info.get("lastUserPrompt"),

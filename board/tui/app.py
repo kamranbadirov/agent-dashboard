@@ -10,6 +10,7 @@ from textual.containers import Horizontal, ItemGrid, Vertical, VerticalScroll
 from textual.widgets import Footer, Static
 
 from ..core import agents, jobs, procs, ptyhost, rexpane
+from ..core.group import group
 from ..core.notify import notify_needs_you, notify_new_commits
 from ..core.sessions import close_session
 from ..core.state import build_state
@@ -38,7 +39,7 @@ class Board(App):
         Binding("s", "start_ticket", "Start ticket"),
         Binding("w", "wizard", "New work"),
         Binding("c", "clean_platforms", "Clean up"),
-        Binding("enter", "resume", "Resume"),
+        Binding("enter", "resume", "Open"),
         Binding("o", "open_session", "Open"),
         Binding("p", "open_pr", "PR"),
         Binding("t", "open_ticket", "Ticket"),
@@ -47,6 +48,7 @@ class Board(App):
         Binding("e", "toggle_inactive", "Inactive"),
         Binding("r", "refresh", "Refresh"),
         Binding("escape", "clear_filter", "Clear filter", show=False),
+        *[Binding(str(n), f"pick({n - 1})", f"Session {n}", show=False) for n in range(1, 10)],
         Binding("q", "quit", "Quit"),
     ]
 
@@ -60,6 +62,7 @@ class Board(App):
         self.in_rex = rexpane.available()
         self.procs = []
         self.alert_id = None
+        self.picks = {}
 
     def compose(self) -> ComposeResult:
         yield TopBar(id="top")
@@ -95,12 +98,10 @@ class Board(App):
     def on_app_focus(self, event):
         """After a click on a desktop alert brings the board to the front, select the agent that needs you."""
         alert_id, self.alert_id = self.alert_id, None
-        if alert_id:
-            self.focused_id = alert_id
-            if self.focus_agent():
-                session = self.selected()
-                if session and self.tmux_record(session):
-                    self.open_agent(self.tmux_record(session)["sessionId"])
+        if alert_id and self.focus_session(alert_id):
+            record = self.tmux_record(self.target())
+            if record:
+                self.open_agent(record["sessionId"])
 
     @work(thread=True, exclusive=True, group="procs")
     def load_procs(self):
@@ -120,7 +121,7 @@ class Board(App):
     def listed(self):
         started = [self.with_record(s) for s in (self.state or {}).get("sessions", [])]
         sessions = [job_session(j) for j in jobs.listed()] + [proc_session(p) for p in self.procs] + started
-        return [s for s in sessions if s["status"] not in ("ended", "done") or self.show_inactive]
+        return [s for s in group(sessions) if s["status"] not in ("ended", "done") or self.show_inactive]
 
     def visible(self):
         return [s for s in self.listed() if self.status_filter in (None, s["status"])]
@@ -208,9 +209,54 @@ class Board(App):
         return [w for w in self.query("AgentTile")]
 
     def leave_terminal(self):
-        card = next((c for c in self.cards() if c.session["sessionId"] == self.focused_id), None)
-        if card:
-            card.focus()
+        self.focus_agent()
+
+    def picked(self, session):
+        """The session the panel acts on: for a ticket, the one picked with 1 to 9, else its lead."""
+        if not session or not session.get("group"):
+            return session
+        index = self.picks.get(session["sessionId"])
+        return session["group"][index] if index is not None and index < len(session["group"]) else session["lead"]
+
+    def target(self):
+        return self.picked(self.selected())
+
+    def focus_session(self, session_id):
+        """Focus the tile of a session, also when it is one of a ticket's sessions."""
+        for card in self.cards():
+            members = [s["sessionId"] for s in card.session.get("group") or []]
+            if card.session["sessionId"] == session_id or session_id in members:
+                if session_id in members:
+                    self.picks[card.session["sessionId"]] = members.index(session_id)
+                self.focused_id = card.session["sessionId"]
+                card.focus()
+                self.show_side(card.session)
+                return True
+        return False
+
+    def action_pick(self, index):
+        s = self.selected()
+        if not s or not s.get("group") or index >= len(s["group"]):
+            return
+        self.picks[s["sessionId"]] = index
+        self.show_side(s)
+        self.action_resume()
+
+    def actions_for(self, session):
+        """The actions the panel offers for a tile, as (key, label, action name)."""
+        target = self.picked(session)
+        out = []
+        if target and (self.tmux_record(target) or target.get("resumeCmd")):
+            out.append(("⏎", "Open", "resume"))
+        if session["prs"]:
+            out.append(("p", "PR", "open_pr"))
+        if session["tickets"]:
+            out.append(("t", "Ticket", "open_ticket"))
+        if target and not (target.get("job") or target.get("proc") or target["sessionId"].startswith("pr:")):
+            out.append(("n", "Rename", "rename_agent"))
+        if target:
+            out.append(("x", "Stop" if target.get("alive") else "Dismiss", "close_agent"))
+        return out
 
     def restore_focus(self):
         if isinstance(self.focused, TerminalView):
@@ -238,6 +284,7 @@ class Board(App):
         return agents.board_agent(session["sessionId"])
 
     def show_side(self, session):
+        tile, session = session, self.picked(session)
         record = self.tmux_record(session)
         if self.in_rex and record:
             self.show_in_pane(record["sessionId"], focus=False, open_new=False)
@@ -247,7 +294,7 @@ class Board(App):
         if in_panel:
             self.query_one(AgentTerminal).show(record, session)
         else:
-            self.query_one(Preview).show(session)
+            self.query_one(Preview).show(tile, session, self.actions_for(tile) if tile else [])
 
     @work(thread=True, exclusive=True, group="rexpane")
     def show_in_pane(self, key, focus, open_new):
@@ -269,7 +316,7 @@ class Board(App):
             self.query_one(AgentTerminal).focus_terminal()
 
     def tile_clicked(self, session):
-        record = self.tmux_record(session)
+        record = self.tmux_record(self.picked(session))
         if record:
             self.open_agent(record["sessionId"])
 
@@ -277,8 +324,7 @@ class Board(App):
         w = self.focused
         if w is not None and hasattr(w, "session"):
             return w.session
-        sessions = (self.state or {}).get("sessions", [])
-        return next((s for s in sessions if s["sessionId"] == self.focused_id), None)
+        return next((s for s in self.listed() if s["sessionId"] == self.focused_id), None)
 
     def action_move(self, step):
         cards = self.cards()
@@ -302,7 +348,7 @@ class Board(App):
         subprocess.Popen(["open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def action_open_session(self):
-        s = self.selected()
+        s = self.target()
         if s and s.get("remoteUrl"):
             self.open_url(s["remoteUrl"])
         elif s:
@@ -325,14 +371,14 @@ class Board(App):
     def wizard_closed(self, result):
         job, action, key = (tuple(result) + (None,))[:3] if isinstance(result, tuple) else (result, None, None)
         if action == "open_proc" and key:
-            self.focused_id = f"proc:{key}"
             self.load_procs()
+            self.set_timer(0.5, lambda: self.focus_session(f"proc:{key}"))
             self.open_agent(key)
         if job and job.state == "running":
             self.notify(f"Setting up {job.label}. Its tile shows the progress.")
         if action == "open_agent" and job.agent:
-            self.focused_id = job.agent["sessionId"]
-            self.notify("The agent's tile appears as soon as it has started." if not self.focus_agent() else "Agent opened.")
+            found = self.focus_session(job.agent["sessionId"])
+            self.notify("Agent opened." if found else "The agent's tile appears as soon as it has started.")
         self.refresh_jobs()
 
     def action_wizard(self):
@@ -360,7 +406,7 @@ class Board(App):
             self.apply_state(self.state)
 
     def action_close_agent(self):
-        s = self.selected()
+        s = self.target()
         if not s:
             return
         if s.get("proc"):
@@ -390,11 +436,11 @@ class Board(App):
             if confirmed:
                 self.close_worker(s["sessionId"])
 
-        self.push_screen(ConfirmClose(s["title"]), done)
+        self.push_screen(ConfirmClose(s["title"], "Stop this agent? You can resume it later.", "stop"), done)
 
     def action_rename_agent(self):
-        s = self.selected()
-        if not s or s.get("job"):
+        s = self.target()
+        if not s or s.get("job") or s.get("proc"):
             return
 
         def done(title):
@@ -422,7 +468,7 @@ class Board(App):
         self.call_from_thread(self.load)
 
     def action_resume(self):
-        s = self.selected()
+        s = self.target()
         if not s:
             return
         record = self.tmux_record(s)
