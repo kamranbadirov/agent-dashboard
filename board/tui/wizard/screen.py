@@ -367,6 +367,9 @@ class WizardScreen(ModalScreen):
         if self.phase == "progress":
             self.show_progress()
             self.set_enabled("continue", self.job.state == "done")
+            if self.job.state != "running":
+                self.head("Done. Press Enter to continue." if self.job.state == "done" else "Failed. The output shows why.",
+                          self.job.label, *self.step_of(self.asked_count() + 2))
             if self.job.state == "failed" and not self.failed_footer:
                 self.failed_footer = True
                 self.foot([("Hide", "hide", "ghost")], [("Close", "close", "plain")])
@@ -375,7 +378,8 @@ class WizardScreen(ModalScreen):
 
     def show_ready(self):
         self.phase = "ready"
-        self.head(f"{self.job.label} is ready", "All repos are on your branch." if self.flow.key in NEW_FLOWS
+        warned = " with warnings" if self.job.warnings else ""
+        self.head(f"{self.job.label} is ready{warned}", "All repos are on your branch." if self.flow.key in NEW_FLOWS
                   else "Real PR branches are checked out, so a push goes to the PR.",
                   *self.step_of(self.asked_count() + 3))
         view = ReadyView()
@@ -386,6 +390,12 @@ class WizardScreen(ModalScreen):
         right = ([(*opener, "plain")] if meta["agent_prompt"] and opener else []) + [("Run dev servers", "servers", "primary")]
         self.foot([("Back to board", "close", "plain")], right)
         self.call_after_refresh(view.update_job, self.job)
+        self.call_after_refresh(self.focus_first_action)
+
+    def focus_first_action(self):
+        buttons = [b for b in self.query("#wizard-foot Btn") if b.action != "close"]
+        if buttons:
+            buttons[0].focus()
 
     def advance(self):
         if self.phase == "progress" and self.job.state == "done":

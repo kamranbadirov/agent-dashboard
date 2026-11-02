@@ -40,11 +40,38 @@ def slugify(text):
     return re.sub(r"[^a-z0-9-]", "-", text.replace("/", "-").lower())
 
 
-def platform_urls(slug, isolated):
-    # the hostnames root's _lib.sh gives a platform (dns_host_label, raichu_app_host, pikachu_api_host)
-    label = slug[: int(lib_value("DEV_HOST_LABEL_LENGTH") or 60)]
-    urls = {name: f"https://{label}.{name}.localhost" for name in ("raichu", "portals", "ditto")}
-    urls["pikachu"] = f"https://{label}.pikachu.localhost" if isolated else "https://pikachu.localhost"
+FRONTEND_DIRS = {"raichu": "raichu", "portals": "Charmander/portals", "ditto": "ditto"}
+
+
+def platform_urls(branch, isolated):
+    """A guess before the platform exists. portless names a frontend after the last part of the branch,
+    and pikachu_api_host in root's _lib.sh names an isolated backend after the platform slug."""
+    label = slugify(branch.rsplit("/", 1)[-1])
+    urls = {name: f"https://{label}.{name}.localhost" for name in FRONTEND_DIRS}
+    slug = slugify(branch)[: int(lib_value("DEV_HOST_LABEL_LENGTH") or 60)]
+    urls["pikachu"] = f"https://{slug}.pikachu.localhost" if isolated else "https://pikachu.localhost"
+    return urls
+
+
+def portless_url(path, name):
+    try:
+        out = subprocess.run(["portless", "get", name], cwd=path, capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    host = out.stdout.strip().split("://", 1)[-1].split(":", 1)[0] if out.returncode == 0 else ""
+    return f"https://{host}" if host else None
+
+
+def live_urls(platform, guess):
+    """The URLs a platform really uses: the ones root wrote to .worktree.env, then portless, as root's frontend_url does."""
+    platform = Path(platform)
+    env = read_env(platform / ".worktree.env")
+    urls = dict(guess)
+    for name, folder in FRONTEND_DIRS.items():
+        if (platform / folder).is_dir():
+            urls[name] = portless_url(platform / folder, name) or urls[name]
+    urls["raichu"] = env.get("RAICHU_URL") or urls["raichu"]
+    urls["pikachu"] = env.get("PIKACHU_URL") or urls["pikachu"]
     return urls
 
 

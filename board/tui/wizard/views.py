@@ -94,7 +94,7 @@ class ProgressView(Vertical):
             return
         expected = job.meta.get("expected", [])
         seen = job.steps
-        shown = list(seen) + [step for step in expected if step not in seen]
+        shown = list(seen) + [step for step in expected if not any(s.startswith(step) for s in seen)]
         text = Text()
         for i, step in enumerate(shown):
             text.append("\n" if i else "")
@@ -119,12 +119,16 @@ class ProgressView(Vertical):
 
 class ReadyView(Vertical):
     def compose(self):
+        yield Callout(kind="warn", id="warnings")
         yield Static(classes="box", id="urls")
         yield Callout(id="agent-note")
 
     def update_job(self, job):
         if not self.query("#urls"):
             return
+        warnings = self.query_one("#warnings", Callout)
+        warnings.display = bool(job.warnings)
+        warnings.update("Root reported problems. Fix them before you rely on this platform:\n" + "\n".join(f"! {w}" for w in job.warnings))
         urls = job.meta["urls"]
         pairs = [(name, urls[name]) for name in ("raichu", "portals", "ditto", "pikachu")]
         self.query_one("#urls", Static).update(key_values(pairs + [("folder", job.meta["platform"])]))

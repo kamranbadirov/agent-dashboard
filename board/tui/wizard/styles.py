@@ -19,6 +19,9 @@ WizardScreen {{ align: center middle; }}
 .btn.ghost:hover {{ color: {INK}; }}
 .btn.link {{ height: 1; border: none; margin: 0; padding: 0 1; }}
 .btn:disabled {{ opacity: 40%; }}
+.btn:focus {{ border: round {AQUA}; }}
+.btn.primary:focus {{ border: round {AQUA}; }}
+.btn.link:focus {{ border: none; color: {AQUA}; text-style: underline; }}
 
 .callout {{ height: auto; padding: 0 1; margin: 1 0 0 0; border-left: tall {BLUE}; background: {BLUE} 10%; color: {INK}; }}
 .callout.error {{ border-left: tall {RED}; background: {RED} 10%; }}

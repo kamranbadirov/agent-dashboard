@@ -49,7 +49,7 @@ def branch_preview(value, answers):
     slug = slugify(value)
     ticket = TICKET_PREFIX_RE.match(value)
     return [("Folder", f"../platform-{slug}"), ("Ticket", ticket.group(0) if ticket else "none found in the name"),
-            ("Frontend URL", platform_urls(slug, False)["raichu"])]
+            ("Frontend URL", platform_urls(value, False)["raichu"])]
 
 
 def pr_options(answers):
