@@ -99,6 +99,7 @@ A removed session comes back only if it has new activity.
 The dashboard can also close idle agents whose PRs are all merged or closed.
 This is off, because an agent often keeps working after its PRs merge, and the close ends it without a warning.
 To turn it on, set `AUTO_CLOSE_MERGED=1`. Agents that are busy are never closed this way.
+To close them yourself, press `X` (shift+x). The board lists the done sessions that still run and asks before it stops them.
 
 ### Raw JSON
 
