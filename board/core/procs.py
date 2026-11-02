@@ -2,6 +2,8 @@ import os
 import re
 
 from . import ptyhost
+from .root import platform_branch, root_dir
+from .transcript import tickets_in
 
 PREFIX = "proc-"
 TITLES = {"run": "Dev servers", "backend": "Shared backend", "fix": "Fix"}
@@ -36,8 +38,19 @@ def start_dev_servers(platform):
     return start("run", os.path.basename(platform), ["make", "run"], platform)
 
 
+def tickets_of(key):
+    kind, _, name = key[len(PREFIX):].partition("-")
+    if kind != "run":
+        return []
+    try:
+        return tickets_in(platform_branch(root_dir().parent / name) or "")
+    except Exception:
+        return []
+
+
 def listed():
-    return [dict(p, title=title_of(p["key"])) for p in ptyhost.sessions() if p["key"].startswith(PREFIX)]
+    return [dict(p, title=title_of(p["key"]), tickets=tickets_of(p["key"]))
+            for p in ptyhost.sessions() if p["key"].startswith(PREFIX)]
 
 
 def stop(key):

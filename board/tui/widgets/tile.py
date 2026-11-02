@@ -64,15 +64,18 @@ class AgentTile(Widget, can_focus=True):
         bottom, links = ticket_line(s)
         if s.get("job"):
             bottom = progress_bar(s["job"].progress, max(1, width - 8))
+        if s.get("group"):
+            bottom.append(f"  {len(s['group'])} sessions", style=MUTED)
         self.links = [(a + 2, b + 2, url) for a, b, url in links]
         if self.chips_width != bottom.cell_len:
             self.chips_width = bottom.cell_len
             self.layout_images()
         bottom.truncate(max(1, width - 4), overflow="ellipsis")
-        bottom.append(" " * max(1, width - bottom.cell_len - 3))
-        bottom.append("✎", style=f"bold {MUTED}")
-        bottom.append(" ")
-        bottom.append("✕", style=f"bold {INK}")
+        if not s.get("group"):
+            bottom.append(" " * max(1, width - bottom.cell_len - 3))
+            bottom.append("✎", style=f"bold {MUTED}")
+            bottom.append(" ")
+            bottom.append("✕", style=f"bold {INK}")
         lines = []
         for body in (title, status, ask, bottom):
             body.truncate(width, overflow="ellipsis")
@@ -84,7 +87,7 @@ class AgentTile(Widget, can_focus=True):
     def on_click(self, event):
         offset = event.get_content_offset(self)
         edge = self.size.width - 4
-        if offset and offset.y == BOTTOM_ROW and offset.x >= edge - 2:
+        if offset and offset.y == BOTTOM_ROW and offset.x >= edge - 2 and not self.session.get("group"):
             self.app.focused_id = self.session["sessionId"]
             if offset.x >= edge:
                 self.app.action_close_agent()
