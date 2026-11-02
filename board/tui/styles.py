@@ -11,6 +11,7 @@ Screen {{ background: #0d1117; }}
 #terminal-view {{ height: 1fr; margin: 1 1 0 2; }}
 #preview-head {{ height: auto; }}
 #preview-actions {{ height: auto; margin: 1 0 0 0; }}
+#preview-plain {{ height: auto; margin: 1 0 0 0; padding: 0 1; border-left: tall {AQUA} 50%; }}
 #preview-sessions {{ height: auto; margin: 1 0 0 0; }}
 #preview-sessions .section {{ margin: 0 0 0 0; }}
 .session-row {{ height: 1; padding: 0 1; }}
