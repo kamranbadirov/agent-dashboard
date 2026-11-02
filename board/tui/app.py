@@ -356,6 +356,11 @@ class Board(App):
             return w.session
         return next((s for s in self.listed() if s["sessionId"] == self.focused_id), None)
 
+    def action_quit(self):
+        if self.in_rex:
+            rexpane.close_pane()
+        self.exit()
+
     def action_move(self, step):
         cards = self.cards()
         if not cards:
