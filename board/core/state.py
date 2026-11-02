@@ -12,12 +12,15 @@ from .store import load_dismissed, load_titles
 from .transcript import parse_transcript, tickets_in
 
 
-def session_tickets(found, prs, cwd):
+def session_tickets(found, prs, cwd, branch=None, created=()):
     """The ticket of the platform the session runs in comes first, because it is the surest. Then the
-    tickets from the transcript, then those in the titles of its PRs. The first one is the main ticket."""
+    tickets from the transcript. Then the tickets of PRs that are this session's own: PRs it opened, or
+    PRs on the branch it works on. A PR the session only links does not count. The first one is the main ticket."""
+    own_branches = {b for b in (branch, platform_branch(cwd)) if b}
     out = tickets_in(platform_branch(cwd) or "") + list(found)
     for p in prs:
-        out += tickets_in(p.get("title") or "")
+        if p["key"] in created or p.get("branch") in own_branches:
+            out += tickets_in(p.get("title") or "")
     return list(dict.fromkeys(out))[:4]
 
 
@@ -116,7 +119,8 @@ def build_state():
                 "status": status,
                 "reasons": reasons,
                 "title": info.get("title") or (info.get("firstPrompt") or "")[:80] or sid[:8],
-                "tickets": session_tickets(info["tickets"], prs, info.get("cwd") or (meta or {}).get("cwd")),
+                "tickets": session_tickets(info["tickets"], prs, info.get("cwd") or (meta or {}).get("cwd"),
+                                           info.get("gitBranch"), set(info.get("createdPrs") or [])),
                 "summary": info.get("summary"),
                 "lastAssistant": (info.get("lastAssistant") or "")[-600:],
                 "lastUserPrompt": info.get("lastUserPrompt"),
