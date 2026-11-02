@@ -71,12 +71,14 @@ class SummaryView(Vertical):
         text = Text()
         for i, r in enumerate(results):
             text.append("\n" if i else "")
-            text.append("✓ " if r["ok"] else "✕ ", style=GREEN if r["ok"] else RED)
+            mark, color = ("✓ ", GREEN) if r["ok"] else ("! ", AQUA) if r["warn"] else ("✕ ", RED)
+            text.append(mark, style=color)
             text.append(r["label"], style=INK)
             if not r["ok"]:
                 text.append(f"  →  {r['fix']}", style=MUTED)
         if recheck_seconds and not all(r["ok"] for r in results):
-            text.append(f"\n\nFix it in another terminal. The checks run again every {recheck_seconds} seconds.", style=MUTED)
+            how = "Press f to run the first fix in the board. " if any(not r["ok"] and r["run"] for r in results) else ""
+            text.append(f"\n\n{how}The checks run again every {recheck_seconds} seconds.", style=MUTED)
         self.query_one("#checks", Static).update(text if results else Text("Nothing to check.", style=MUTED))
 
 

@@ -24,6 +24,21 @@ def job_session(job):
     }
 
 
+def proc_session(proc):
+    """A program such as make run in a board tmux session, shaped like an agent so the board can show it as a tile."""
+    failed = proc["dead"] and proc["exitCode"] not in (0, None)
+    status = ("your_move" if failed else "done") if proc["dead"] else "working"
+    return {
+        "sessionId": f"proc:{proc['key']}", "name": "in the board", "pid": None, "alive": not proc["dead"], "busy": not proc["dead"],
+        "status": status, "reasons": [f"exited with code {proc['exitCode']}"] if failed else [],
+        "title": proc["title"], "tickets": [], "prs": [], "summary": None, "lastAssistant": None,
+        "lastUserPrompt": None, "pendingTool": None,
+        "pendingQuestion": ("Finished." if not failed else f"Exited with code {proc['exitCode']}.") if proc["dead"] else "Running. Select it to see the output.",
+        "lastActivity": datetime.fromtimestamp(proc["created"], timezone.utc).isoformat(),
+        "cwd": None, "gitBranch": None, "remoteUrl": None, "resumeCmd": None, "proc": proc,
+    }
+
+
 def job_text(job):
     text = Text()
     text.append("Steps\n", style=f"bold {INK}")

@@ -31,6 +31,7 @@ board/
     jobs.py          run root's scripts in a thread, keep their steps and output
     ptyhost.py       the tmux host: start, capture, resize and attach board agents
     rexpane.py       inside Rex: show a board agent in a Rex pane beside the board
+    procs.py         programs in board tmux that are not agents: dev servers, the backend, check fixes
     tmux.conf        the board's own tmux config; the user's ~/.tmux.conf never applies
     agents.py        start and resume agents: in the board or in a terminal app
     wizard/          the work wizard without UI: flows.py (questions), commands.py, preflight.py, prs.py, run.py
@@ -54,6 +55,7 @@ board/
 - Inside Rex (`REX_SESSION` and `REX_BLOCK` set, `rex` on the PATH), the board shows agents in a Rex pane to its right. Enter or a click on a board agent opens the pane with `rex split`, and the pane runs `tmux attach`. Moving to another board agent runs `tmux switch-client` on that pane. It does not open a new pane. `ctrl+]` in the pane detaches and closes it. The right panel then shows only the preview.
 - Outside Rex, the right panel shows the agent. It reads `tmux capture-pane` every 250 ms in a thread, and only while the panel shows. Enter or a printable key on the panel suspends the board and runs `tmux attach`. `ctrl+]` detaches and goes back to the board.
 - Enter on an ended board agent starts `claude --resume` in tmux, then shows it.
+- Programs that may ask for input run in board tmux too, never in another terminal app: `make run` (dev servers), `make backend` and the fix for a failed check. Each one is a tmux session named `proc-<kind>-<name>`, and it shows as a tile. Its pane stays after the program exits (`remain-on-exit`), so you can read the output. `x` stops it.
 - `tmux pipe-pane` appends the agent's output to `terminals/<id>.log`. This `pipe-pane` command string is the one shell string, and `shlex.quote` quotes its path.
 - If `tmux` is missing, the panel shows one error. The board does not crash.
 - `AGENT_COMMAND` replaces `claude`. Use it to test with a fake agent.

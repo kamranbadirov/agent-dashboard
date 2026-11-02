@@ -55,15 +55,6 @@ def launch_in_terminal(key, cwd, argv, app):
     return subprocess.run(["open", "-a", app, str(script)], capture_output=True, text=True)
 
 
-def run_dev_servers(platform, where, app):
-    try:
-        result = launch_in_terminal(f"run-{os.path.basename(platform)}", platform, ["make", "run"],
-                                    app if where == TERMINAL and app else "Terminal")
-    except OSError as e:
-        return False, f"Could not start the dev servers: {e}"
-    return result.returncode == 0, result.stderr.strip() or "Started."
-
-
 def bring_forward(where, app):
     subprocess.run(["open", "-a", app or "Terminal"], capture_output=True)
 

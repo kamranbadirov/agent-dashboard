@@ -6,6 +6,7 @@ from ..agents import installed_terminals
 from ..root import browser_port, platform_dir, platform_urls, platforms, repo_names, slugify
 from .infer import infer
 from .model import Flow, Option, Question
+from .preflight import shared_backend_up
 from .prs import search
 
 BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
@@ -162,12 +163,17 @@ CLEAN = Flow("clean", "Clean up a platform", "Delete a worktree, its docker stac
     Question("platforms", "multi", "Which platforms?", "Select one or more to delete.", platform_options, validate=check_picked),
 ], typed_confirm=lambda a: DELETE_WORD if any_dirty(a) else None)
 
+def backend_options(answers):
+    up = shared_backend_up()
+    state = "It is up now." if up else "It is down now."
+    start = Option("start", "Start", f"Starts or resumes it. {state} It runs in the board, so you can type a password.")
+    stop = Option("stop", "Stop", f"Pauses it to free memory. The containers and the database stay. {state}")
+    return [stop, start] if up else [start, stop]
+
+
 BACKEND_FLOW = Flow("backend", "Shared backend", "Start or pause the pikachu backend that platforms share.",
                     "make backend · make backend-stop", [
-    Question("action", "choice", "Start or stop the shared backend?", "", [
-        Option("start", "Start", "Starts or resumes it."),
-        Option("stop", "Stop", "Pauses it to free memory. The containers and the database stay."),
-    ]),
+    Question("action", "choice", "Start or stop the shared backend?", "", backend_options),
 ])
 
 BROWSER = Flow("browser", "Shared browser", "The Chrome window that QA agents attach to.",

@@ -37,17 +37,37 @@ def set_size(rows, cols):
     _size[:] = [rows, cols]
 
 
-def spawn(key, argv, cwd):
+def spawn(key, argv, cwd, env=None, keep=False):
     if not available():
         return False, MISSING
     rows, cols = _size
-    result = tmux("new-session", "-d", "-s", key, "-x", str(cols), "-y", str(rows), "-c", str(cwd), "--", *argv)
+    env_args = [arg for name, value in (env or {}).items() for arg in ("-e", f"{name}={value}")]
+    keep_args = [";", "set-option", "-p", "-t", f"={key}:", "remain-on-exit", "on"] if keep else []
+    result = tmux("new-session", "-d", "-s", key, "-x", str(cols), "-y", str(rows), "-c", str(cwd), *env_args,
+                  "--", *argv, *keep_args)
     if result.returncode != 0:
         return False, result.stderr.strip() or "Could not start the agent in tmux."
     _sizes[key] = (rows, cols)
     TERMINALS_DIR.mkdir(parents=True, exist_ok=True)
     tmux("pipe-pane", "-o", "-t", f"={key}:", f"cat >> {shlex.quote(str(log_path(key)))}")
     return True, "Agent started."
+
+
+def kill(key):
+    return tmux("kill-session", "-t", f"={key}").returncode == 0
+
+
+def sessions():
+    """Every tmux session on the board's socket: name, whether its program exited, its exit code, when it started."""
+    result = tmux("list-sessions", "-F", "#{session_name}\t#{pane_dead}\t#{pane_dead_status}\t#{session_created}")
+    if result.returncode != 0:
+        return []
+    out = []
+    for line in result.stdout.splitlines():
+        name, dead, status, created = (line.split("\t") + ["", "", "", ""])[:4]
+        out.append({"key": name, "dead": dead == "1", "exitCode": int(status) if status.isdigit() else None,
+                    "created": int(created) if created.isdigit() else 0})
+    return out
 
 
 def alive(key):

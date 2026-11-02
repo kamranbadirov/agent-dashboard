@@ -1,4 +1,4 @@
-from .. import agents, jobs
+from .. import agents, jobs, procs
 from ..config import TICKET_RE
 from ..root import platform_urls
 from .commands import NEW_FLOWS, PLATFORM_FLOWS, build, expected_steps, review_prs
@@ -50,6 +50,12 @@ def job_meta(flow, answers, command):
         meta["platform"] = command.platform
         meta["urls"] = platform_urls(command.slug, answers["backend"] == "isolated")
     return meta
+
+
+def launch_in_tmux(flow, answers):
+    """Run a flow whose script may ask for a password or a yes, such as make backend, in a board tmux session."""
+    command = build(flow, answers)[0]
+    return procs.start(flow, answers.get("action", flow), command.steps[0], command.cwd, command.env)
 
 
 def launch(flow, answers):

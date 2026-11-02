@@ -1,13 +1,15 @@
+import http.client
 import os
 import shutil
 import socket
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
-from ..root import lib_value, platform_dir, slugify
+from ..root import lib_value, platform_dir, root_dir, slugify
 from .commands import NEW_FLOWS, review_slug
 
 PROXY_PORT = 443
+SHARED_BACKEND_PORT = 80
 
 
 def succeeds(argv, timeout=15):
@@ -25,37 +27,55 @@ def proxy_running():
         return False
 
 
-def check(label, ok, fix):
-    return {"label": label, "ok": ok, "fix": fix}
+def shared_backend_up():
+    """The same probe as root's run.sh: any 2xx, 3xx or 4xx answer on port 80 means the backend serves."""
+    try:
+        conn = http.client.HTTPConnection("localhost", SHARED_BACKEND_PORT, timeout=2)
+        conn.request("GET", "/")
+        status = conn.getresponse().status
+        conn.close()
+        return 200 <= status < 500
+    except (OSError, http.client.HTTPException):
+        return False
+
+
+def check(label, ok, fix, run=None, warn=False):
+    """One check. run is the argv the board can run to fix it, in the root folder. A warn check does not block."""
+    return {"label": label, "ok": ok, "fix": fix, "run": run, "warn": warn}
 
 
 def has_gum():
-    return check("gum installed", bool(shutil.which("gum")), "brew install gum")
+    return check("gum installed", bool(shutil.which("gum")), "brew install gum", ["brew", "install", "gum"])
 
 
 def has_proxy():
     return check("portless proxy running", bool(shutil.which("portless")) and proxy_running(),
-                 "sudo portless proxy start --https")
+                 "sudo portless proxy start --https", ["sudo", "portless", "proxy", "start", "--https"])
 
 
 def has_gh_login():
-    return check("GitHub login", succeeds(["gh", "auth", "status"]), "gh auth login")
+    return check("GitHub login", succeeds(["gh", "auth", "status"]), "gh auth login", ["gh", "auth", "login"])
 
 
 def has_docker():
-    return check("Docker running", succeeds(["docker", "info"]), "Start Docker Desktop")
+    return check("Docker running", succeeds(["docker", "info"]), "Start Docker Desktop", ["open", "-a", "Docker"])
 
 
 def has_aws():
     profile = os.environ.get("AWS_PROFILE", "default")
     return check("AWS login", succeeds(["aws", "configure", "export-credentials", "--profile", profile]),
-                 f"aws sso login --profile {profile}")
+                 f"aws sso login --profile {profile}", ["aws", "sso", "login", "--profile", profile])
 
 
 def has_shared_database():
     volume = lib_value("MAIN_DB_VOLUME")
     return check("Shared pikachu database", succeeds(["docker", "volume", "inspect", volume]),
-                 "make backend, from the root folder")
+                 "make backend, from the root folder", ["make", "backend"])
+
+
+def has_shared_backend():
+    return check("Shared backend up", shared_backend_up(), "make backend. The platform can still be created.",
+                 ["make", "backend"], warn=True)
 
 
 def folder_free(slug):
@@ -74,7 +94,21 @@ def checks_for(flow, answers):
         checks.append(has_gh_login)
     if answers["backend"] == "isolated":
         checks += [has_docker, has_aws, has_shared_database]
+    else:
+        checks.append(has_shared_backend)
     return checks
+
+
+def passed(results):
+    return all(r["ok"] or r["warn"] for r in results)
+
+
+def fixable(results):
+    return next((r for r in results if not r["ok"] and r["run"]), None)
+
+
+def fix_cwd():
+    return str(root_dir())
 
 
 def run(flow, answers):

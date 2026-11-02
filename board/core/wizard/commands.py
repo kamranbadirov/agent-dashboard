@@ -5,6 +5,7 @@ from ..root import platform_dir, root_dir, slugify
 PREPARE = [["make", "prepare"], ["make", "_source_repos"]]
 NEW_FLOWS = ("new", "ticket")
 PLATFORM_FLOWS = NEW_FLOWS + ("review",)
+IN_TMUX_FLOWS = ("backend",)
 BROWSER_HOST = ["bash", "scripts/browser-host.sh"]
 
 
