@@ -65,6 +65,15 @@ def open_pane(key, focus):
     return False, "The pane opened, but tmux did not attach in it."
 
 
+def close_pane():
+    """Close the board's Rex pane. Only its tmux attach ends; the agent keeps running in tmux."""
+    with _lock:
+        block = _pane["block"]
+        _pane.update(block=None, tty=None)
+        if block and block in blocks():
+            rex("block", "close", "-s", os.environ["REX_SESSION"], block)
+
+
 def open_tab(key, title):
     result = rex("window", "new", "-s", os.environ["REX_SESSION"], title[:40], "--json", "--", *ptyhost.attach_argv(key))
     return result.returncode == 0, result.stderr.strip() or "Rex could not open a tab."
