@@ -12,7 +12,7 @@ from textual.widgets import Footer, Static
 from ..core import agents, jobs, procs, ptyhost, rexpane
 from ..core.group import group
 from ..core.notify import notify_needs_you, notify_new_commits
-from ..core.sessions import close_session
+from ..core.sessions import close_all, close_session, done_and_live
 from ..core.state import build_state
 from ..core.store import dismiss_session, rename_session
 from .jobs_view import job_session, proc_session, with_agent_record
@@ -45,6 +45,7 @@ class Board(App):
         Binding("t", "open_ticket", "Ticket"),
         Binding("n", "rename_agent", "Rename"),
         Binding("x", "close_agent", "Close"),
+        Binding("X", "close_done", "Close all done", show=False),
         Binding("e", "toggle_inactive", "Inactive"),
         Binding("r", "refresh", "Refresh"),
         Binding("escape", "clear_filter", "Clear filter", show=False),
@@ -437,6 +438,27 @@ class Board(App):
                 self.close_worker(s["sessionId"])
 
         self.push_screen(ConfirmClose(s["title"], "Stop this agent? You can resume it later.", "stop"), done)
+
+    def action_close_done(self):
+        found = done_and_live((self.state or {}).get("sessions", []))
+        if not found:
+            self.notify("No done session is running.")
+            return
+        names = ", ".join(s["title"][:30] for s in found[:3]) + (f" and {len(found) - 3} more" if len(found) > 3 else "")
+
+        def done(confirmed):
+            if confirmed:
+                self.close_all_worker([s["sessionId"] for s in found])
+
+        self.push_screen(ConfirmClose(names, f"Stop {len(found)} done session{'s' if len(found) > 1 else ''}? "
+                                      "You can resume each one later.", "stop"), done)
+
+    @work(thread=True)
+    def close_all_worker(self, session_ids):
+        closed, failed = close_all(session_ids)
+        message = f"Stopped {closed}." + (f" {failed} could not be stopped." if failed else "")
+        self.call_from_thread(self.notify, message, severity="warning" if failed else "information")
+        self.call_from_thread(self.load)
 
     def action_rename_agent(self):
         s = self.target()

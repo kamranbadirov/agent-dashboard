@@ -72,6 +72,17 @@ def close_session(session_id):
     return True, "Close requested; the agent is still shutting down."
 
 
+def done_and_live(sessions):
+    """Live sessions whose PRs are all merged or closed, and that are not busy."""
+    return [s for s in sessions if s["alive"] and not s.get("busy") and s["status"] == "done"]
+
+
+def close_all(session_ids):
+    results = [close_session(sid) for sid in session_ids]
+    closed = sum(1 for ok, _ in results if ok)
+    return closed, len(results) - closed
+
+
 def auto_close_merged(sessions):
     for s in sessions:
         if s["alive"] and not s["busy"] and s["status"] == "done":
