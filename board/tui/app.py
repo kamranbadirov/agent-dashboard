@@ -9,7 +9,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, ItemGrid, Vertical, VerticalScroll
 from textual.widgets import Footer, Static
 
-from ..core import agents, jobs
+from ..core import agents, jobs, ptyhost, rexpane
 from ..core.notify import notify_needs_you, notify_new_commits
 from ..core.sessions import close_session
 from ..core.state import build_state
@@ -57,6 +57,7 @@ class Board(App):
         self.show_inactive = False
         self.status_filter = None
         self.focused_id = None
+        self.in_rex = rexpane.available()
 
     def compose(self) -> ComposeResult:
         yield TopBar(id="top")
@@ -202,12 +203,38 @@ class Board(App):
 
     def show_side(self, session):
         record = session and agents.board_agent(session["sessionId"])
-        self.query_one("#terminal").display = bool(record)
-        self.query_one("#preview").display = not record
-        if record:
+        if self.in_rex and record:
+            self.show_in_pane(record["sessionId"], focus=False, open_new=False)
+        in_panel = bool(record) and not self.in_rex
+        self.query_one("#terminal").display = in_panel
+        self.query_one("#preview").display = not in_panel
+        if in_panel:
             self.query_one(AgentTerminal).show(record, session)
         else:
             self.query_one(Preview).show(session)
+
+    @work(thread=True, exclusive=True, group="rexpane")
+    def show_in_pane(self, key, focus, open_new):
+        if not ptyhost.alive(key):
+            if not open_new:
+                return
+            ok, message = agents.resume_agent(key)
+            if not ok:
+                self.call_from_thread(self.notify, message, severity="error")
+                return
+        ok, message = rexpane.show(key, focus=focus, open_new=open_new)
+        if not ok:
+            self.call_from_thread(self.notify, message, severity="error")
+
+    def open_agent(self, session_id):
+        if self.in_rex:
+            self.show_in_pane(session_id, focus=True, open_new=True)
+        else:
+            self.query_one(AgentTerminal).focus_terminal()
+
+    def tile_clicked(self, session):
+        if agents.board_agent(session["sessionId"]):
+            self.open_agent(session["sessionId"])
 
     def selected(self):
         w = self.focused
@@ -344,7 +371,7 @@ class Board(App):
         if not s:
             return
         if agents.board_agent(s["sessionId"]):
-            self.query_one(AgentTerminal).focus_terminal()
+            self.open_agent(s["sessionId"])
             return
         if not s.get("resumeCmd"):
             self.action_open_pr()
@@ -357,7 +384,7 @@ class Board(App):
             self.notify(message, severity="error")
             return
         self.show_side(s)
-        self.query_one(AgentTerminal).focus_terminal()
+        self.open_agent(s["sessionId"])
 
 
 def main():

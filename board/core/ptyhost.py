@@ -73,7 +73,25 @@ def send_text(key, text):
     tmux("send-keys", "-t", f"={key}:", "-l", text)
 
 
-def attach(key):
+def release_size(key):
     tmux("set-option", "-w", "-u", "-t", f"={key}:", "window-size")
     _sizes.pop(key, None)
-    return subprocess.run(tmux_argv("attach-session", "-t", f"={key}"), env=outside_tmux()).returncode
+
+
+def attach_argv(key):
+    return tmux_argv("attach-session", "-t", f"={key}")
+
+
+def attach(key):
+    release_size(key)
+    return subprocess.run(attach_argv(key), env=outside_tmux()).returncode
+
+
+def clients():
+    result = tmux("list-clients", "-F", "#{client_tty}")
+    return set(result.stdout.split()) if result.returncode == 0 else set()
+
+
+def switch_client(tty, key):
+    release_size(key)
+    return tmux("switch-client", "-c", tty, "-t", f"={key}").returncode == 0

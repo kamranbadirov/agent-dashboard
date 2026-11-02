@@ -30,12 +30,13 @@ board/
     root.py          find the root checkout, list its platforms
     jobs.py          run root's scripts in a thread, keep their steps and output
     ptyhost.py       the tmux host: start, capture, resize and attach board agents
+    rexpane.py       inside Rex: show a board agent in a Rex pane beside the board
     tmux.conf        the board's own tmux config; the user's ~/.tmux.conf never applies
     agents.py        start and resume agents: in the board or in a terminal app
     wizard/          the work wizard without UI: flows.py (questions), commands.py, preflight.py, prs.py, run.py
   tui/               terminal board (Textual)
     wizard/          the wizard screen and its inputs; it only renders core/wizard/flows.py
-    widgets/terminal.py   the read-only agent preview in the right panel; a key attaches to tmux
+    widgets/terminal.py   outside Rex: the read-only agent preview in the right panel; a key attaches to tmux
   assets/            repo images
 ```
 
@@ -50,9 +51,9 @@ board/
 - The work wizard (key `w` in the terminal board) runs the scripts of the root checkout (`ROOT_REPO`; when it is not set, the dashboard's parent folder if that is a root checkout, else `~/Documents/root`). Questions are data in `core/wizard/flows.py`; to add or change a question, change it there, not in `tui/`. Answers reach root only through its environment variable overrides (`BRANCH`, `BACKEND`, `PRS`, `PLATFORM`, ...). Commands are argv lists, never shell strings. The repo list is read from root's `scripts/_lib.sh`, not copied.
 - tmux hosts the agents that the board starts. Each agent is one tmux session on the private socket `agent-board`. The board starts tmux with `core/tmux.conf`.
 - A tmux session outlives the board. After a board restart, an agent with a live tmux session is still alive. The board does not start it again.
-- The right panel only shows the agent. It reads `tmux capture-pane` every 250 ms in a thread, and only while the panel shows.
-- Enter or a printable key on the panel suspends the board and runs `tmux attach`. The user's own terminal draws the agent. `ctrl+]` detaches and goes back to the board.
-- A key on an ended agent starts `claude --resume` in tmux and attaches at once.
+- Inside Rex (`REX_SESSION` and `REX_BLOCK` set, `rex` on the PATH), the board shows agents in a Rex pane to its right. Enter or a click on a board agent opens the pane with `rex split`, and the pane runs `tmux attach`. Moving to another board agent runs `tmux switch-client` on that pane. It does not open a new pane. `ctrl+]` in the pane detaches and closes it. The right panel then shows only the preview.
+- Outside Rex, the right panel shows the agent. It reads `tmux capture-pane` every 250 ms in a thread, and only while the panel shows. Enter or a printable key on the panel suspends the board and runs `tmux attach`. `ctrl+]` detaches and goes back to the board.
+- Enter on an ended board agent starts `claude --resume` in tmux, then shows it.
 - `tmux pipe-pane` appends the agent's output to `terminals/<id>.log`. This `pipe-pane` command string is the one shell string, and `shlex.quote` quotes its path.
 - If `tmux` is missing, the panel shows one error. The board does not crash.
 - `AGENT_COMMAND` replaces `claude`. Use it to test with a fake agent.

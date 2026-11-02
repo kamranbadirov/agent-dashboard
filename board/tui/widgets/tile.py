@@ -94,4 +94,7 @@ class AgentTile(Widget, can_focus=True):
             for start, end, url in self.links:
                 if start <= offset.x < end:
                     self.app.open_url(url)
-                    break
+                    return
+            self.app.tile_clicked(self.session)
+        else:
+            self.app.tile_clicked(self.session)
