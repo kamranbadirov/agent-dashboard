@@ -96,9 +96,9 @@ Press `x` on an agent. What it does depends on the agent:
 The dashboard saves removed sessions in `dismissed.json`.
 A removed session comes back only if it has new activity.
 
-The dashboard also closes agents by itself when all their PRs are merged or closed and the agent is idle.
-Agents that are busy are never closed this way.
-To turn this off, set `AUTO_CLOSE_MERGED=0`.
+The dashboard can also close idle agents whose PRs are all merged or closed.
+This is off, because an agent often keeps working after its PRs merge, and the close ends it without a warning.
+To turn it on, set `AUTO_CLOSE_MERGED=1`. Agents that are busy are never closed this way.
 
 ### Raw JSON
 
@@ -118,7 +118,7 @@ Set these environment variables to change the defaults:
 | `STALE_HOURS` | `24` | Hours without activity before an agent becomes inactive. |
 | `NOTIFY_NEEDS_YOU` | `1` | Set to `0` to stop the desktop notification when an agent asks a question or waits for a tool approval. |
 | `INFER_MODEL` | `haiku` | The Claude model that reads a ticket when you press `s`. |
-| `AUTO_CLOSE_MERGED` | `1` | Set to `0` to stop the dashboard from closing idle agents whose PRs are all merged or closed. |
+| `AUTO_CLOSE_MERGED` | `0` | Set to `1` to let the dashboard close idle agents whose PRs are all merged or closed. |
 
 Example:
 
