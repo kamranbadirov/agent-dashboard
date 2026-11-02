@@ -196,13 +196,14 @@ def backend_options(answers):
     state = "It is up now." if up else "It is down now."
     start = Option("start", "Start", f"Starts or resumes it. {state} It runs in the board, so you can type a password.")
     stop = Option("stop", "Stop", f"Pauses it to free memory. The containers and the database stay. {state}")
-    return [stop, start] if up else [start, stop]
+    return [start, stop]
 
 
 BACKEND_FLOW = Flow("backend", "Shared backend", "Start or pause the pikachu backend that platforms share.",
                     "make backend · make backend-stop", [
     Question("action", "choice", "Start or stop the shared backend?", "", backend_options),
-])
+], typed_confirm=lambda a: "stop" if a.get("action") == "stop" else None,
+   confirm_note=lambda a: "Every platform on the shared backend loses its API until you start it again. Type stop to confirm.")
 
 BROWSER = Flow("browser", "Shared browser", "The Chrome window that QA agents attach to.",
                "make browser-host · make browser-host-stop", [
