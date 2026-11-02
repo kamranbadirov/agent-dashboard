@@ -530,8 +530,13 @@ class Board(App):
             self.action_open_pr()
             return
         if s["alive"]:
-            self.notify(f"{s.get('name') or 'This agent'} runs outside the board. Close it there, then press Enter here "
-                        "to resume it in the board.", timeout=8)
+            def move(confirmed):
+                if confirmed:
+                    self.move_worker(s)
+
+            self.push_screen(ConfirmClose(s["title"], f"Move this session into the board? It stops in "
+                                          f"{s.get('name') or 'its terminal'} and resumes here, with its whole conversation.",
+                                          "move"), move)
             return
         ok, message = agents.adopt_agent(s["sessionId"], s.get("cwd"), s["title"])
         if not ok:
@@ -539,6 +544,17 @@ class Board(App):
             return
         self.show_side(s)
         self.open_agent(s["sessionId"])
+
+
+    @work(thread=True)
+    def move_worker(self, s):
+        ok, message = agents.move_into_board(s["sessionId"], s.get("cwd"), s["title"])
+        if not ok:
+            self.call_from_thread(self.notify, message, severity="error")
+            return
+        self.call_from_thread(self.notify, "Moved into the board.")
+        self.call_from_thread(self.load)
+        self.call_from_thread(self.open_agent, s["sessionId"])
 
 
 def main():

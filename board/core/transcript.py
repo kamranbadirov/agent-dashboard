@@ -69,6 +69,41 @@ def conversation_prs(path):
     return prs
 
 
+def is_pr_create(block):
+    name = block.get("name") or ""
+    command = str((block.get("input") or {}).get("command") or "")
+    return name.endswith("create_pull_request") or (name == "Bash" and "gh pr create" in command)
+
+
+def result_text(block):
+    content = block.get("content")
+    if isinstance(content, str):
+        return content
+    return "\n".join(part.get("text", "") for part in content or [] if isinstance(part, dict))
+
+
+def created_prs(path):
+    """The PRs this session opened itself: the URL in the result of its gh pr create call."""
+    creating, out = set(), set()
+    with open(path, "rb") as f:
+        for line in f:
+            if b"gh pr create" not in line and b"create_pull_request" not in line and b"/pull/" not in line:
+                continue
+            try:
+                rec = json.loads(line)
+            except Exception:
+                continue
+            content = (rec.get("message") or {}).get("content")
+            for block in content if isinstance(content, list) else []:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "tool_use" and is_pr_create(block):
+                    creating.add(block.get("id"))
+                elif block.get("type") == "tool_result" and block.get("tool_use_id") in creating:
+                    out.update(f"{o}/{r}#{n}" for o, r, n in PR_RE.findall(result_text(block)))
+    return sorted(out)
+
+
 def parse_transcript(path):
     head = read_head(path)
     tail = read_tail(path)
@@ -146,5 +181,6 @@ def parse_transcript(path):
                 priority.append(t)
     info["tickets"] = priority[:4]
     info["prs"] = list(prs.values())
+    info["createdPrs"] = created_prs(path)
     info.pop("_custom", None)
     return info

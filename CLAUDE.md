@@ -59,6 +59,7 @@ board/
 - Inside Rex (`REX_SESSION` and `REX_BLOCK` set, `rex` on the PATH), the board shows agents in a Rex pane to its right. Enter or a click on a board agent opens the pane with `rex split`, and the pane runs `tmux attach`. Moving to another board agent runs `tmux switch-client` on that pane. It does not open a new pane. `ctrl+]` in the pane detaches and closes it. The right panel then shows only the preview.
 - Outside Rex, the right panel shows the agent. It reads `tmux capture-pane` every 250 ms in a thread, and only while the panel shows. Enter or a printable key on the panel suspends the board and runs `tmux attach`. `ctrl+]` detaches and goes back to the board.
 - Enter on an ended board agent starts `claude --resume` in tmux, then shows it.
+- Enter on a live session that runs outside the board offers to move it in. After a confirm, the board stops it (SIGTERM), waits until the old process exits, then resumes it in board tmux. A busy session is not moved.
 - Programs that may ask for input run in board tmux too, never in another terminal app: `make run` (dev servers), `make backend` and the fix for a failed check. Each one is a tmux session named `proc-<kind>-<name>`, and it shows as a tile. Its pane stays after the program exits (`remain-on-exit`), so you can read the output. `x` stops it.
 - `tmux pipe-pane` appends the agent's output to `terminals/<id>.log`. This `pipe-pane` command string is the one shell string, and `shlex.quote` quotes its path.
 - If `tmux` is missing, the panel shows one error. The board does not crash.
@@ -69,7 +70,7 @@ board/
 
 The tile follows "option C": a colored rail on the left, then title and time, the status, and a bottom row with the ticket chip, round repo logos and the ✎ ✕ buttons. Do not show PR numbers. Each logo opens its PR.
 
-A tile is a ticket. The sessions whose main ticket is the same share one tile (`core/group.py`). The main ticket is the first one found: the platform's branch, then the transcript, then the PR titles. The tile shows the most urgent status of its sessions and "N sessions", and it has no ✎ ✕. A session with no ticket keeps a tile of its own.
+A tile is a ticket. The sessions whose main ticket is the same share one tile (`core/group.py`). The main ticket is the first one found: the platform's branch, then the transcript, then the titles of the session's own PRs. A PR is the session's own when the session opened it (`gh pr create` in its transcript) or works on its branch. A PR the session only links does not count. The tile shows the most urgent status of its sessions and "N sessions", and it has no ✎ ✕. A session with no ticket keeps a tile of its own.
 
 The side panel starts with the title, then one quiet row of actions with their keys (`⏎ Open  p PR  t Ticket  n Rename  x Stop`). There is no red button. "Stop" reads "Dismiss" for an ended session. For a ticket, the panel lists its sessions as numbered rows. `1` to `9` or a click picks and opens one, and the actions apply to the picked session. Enter opens the lead session: the most urgent live one, else the newest.
 

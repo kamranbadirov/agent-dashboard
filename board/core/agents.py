@@ -1,6 +1,7 @@
 import os
 import shlex
 import subprocess
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,6 +10,9 @@ from . import ptyhost, rexpane
 from .cache import JsonFile
 from .config import AGENT_COMMAND, AGENTS_FILE, TERMINALS_DIR
 from .root import read_env
+from .sessions import close_session, live_sessions, pid_alive
+
+MOVE_WAIT_SECONDS = 10
 
 BACKGROUND, TERMINAL = "background", "terminal"
 TERMINAL_APPS = {
@@ -99,6 +103,24 @@ def adopt_agent(session_id, cwd, title):
     }
     _registry.change(lambda data: data.__setitem__(session_id, record))
     return resume_agent(session_id)
+
+
+def move_into_board(session_id, cwd, title):
+    """Stop a session that runs in another terminal, then resume it in board tmux. It waits until the old
+    process has exited, so the session never runs twice."""
+    meta = live_sessions().get(session_id)
+    if meta and meta.get("status") == "busy":
+        return False, "It is working right now. Try again when it is idle."
+    ok, message = close_session(session_id)
+    if not ok:
+        return False, message
+    pid = (meta or {}).get("pid")
+    deadline = time.time() + MOVE_WAIT_SECONDS
+    while pid and pid_alive(pid):
+        if time.time() > deadline:
+            return False, "The old session did not stop, so it was not moved."
+        time.sleep(0.2)
+    return adopt_agent(session_id, cwd, title)
 
 
 def resume_agent(session_id):
