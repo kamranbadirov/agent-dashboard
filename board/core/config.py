@@ -36,6 +36,8 @@ REX_APP_ID = "com.superlogical.rex"
 BOARD_APP_ID = os.environ.get("BOARD_APP_ID") or (REX_APP_ID if os.environ.get("REX_SESSION") else os.environ.get("__CFBundleIdentifier"))
 INFER_MODEL = os.environ.get("INFER_MODEL", "haiku")
 AGENTS_FILE = ROOT / "agents.json"
+PLAIN_FILE = ROOT / "plain.json"
+PLAIN_RECHECK_SECONDS = int(os.environ.get("PLAIN_RECHECK_SECONDS", "3600"))
 TERMINALS_DIR = ROOT / "terminals"
 JSON_WRITE_DELAY_SECONDS = 0.5
 

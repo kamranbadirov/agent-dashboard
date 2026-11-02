@@ -9,7 +9,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, ItemGrid, Vertical, VerticalScroll
 from textual.widgets import Footer, Static
 
-from ..core import agents, jobs, procs, ptyhost, rexpane
+from ..core import agents, jobs, plain, procs, ptyhost, rexpane
 from ..core.group import group
 from ..core.notify import notify_needs_you, notify_new_commits
 from ..core.sessions import close_all, close_session, done_and_live
@@ -48,6 +48,7 @@ class Board(App):
         Binding("X", "close_done", "Close all done", show=False),
         Binding("e", "toggle_inactive", "Inactive"),
         Binding("r", "refresh", "Refresh"),
+        Binding("u", "plain_refresh", "Plain words", show=False),
         Binding("escape", "clear_filter", "Clear filter", show=False),
         *[Binding(str(n), f"pick({n - 1})", f"Session {n}", show=False) for n in range(1, 10)],
         Binding("q", "quit", "Quit"),
@@ -284,8 +285,36 @@ class Board(App):
             return {"sessionId": session["proc"]["key"], "title": session["title"], "where": "background"}
         return agents.board_agent(session["sessionId"])
 
+    def main_ticket(self, tile):
+        return tile["tickets"][0] if tile and tile.get("tickets") else None
+
+    def ensure_plain(self, tile, force=False):
+        ticket = self.main_ticket(tile)
+        if ticket and (force or plain.is_due(ticket)):
+            self.plain_worker(ticket, force)
+
+    @work(thread=True, group="plain")
+    def plain_worker(self, ticket, force):
+        plain.refresh(ticket, force)
+        self.call_from_thread(self.redraw_preview, ticket)
+
+    def redraw_preview(self, ticket):
+        tile = self.selected()
+        preview = self.query_one(Preview)
+        if preview.display and self.main_ticket(tile) == ticket:
+            preview.show(tile, self.picked(tile), self.actions_for(tile))
+
+    def action_plain_refresh(self):
+        tile = self.selected()
+        if not self.main_ticket(tile):
+            self.notify("This tile has no ticket.")
+            return
+        self.ensure_plain(tile, force=True)
+        self.notify(f"Reading {self.main_ticket(tile)} again.")
+
     def show_side(self, session):
         tile, session = session, self.picked(session)
+        self.ensure_plain(tile)
         record = self.tmux_record(session)
         if self.in_rex and record:
             self.show_in_pane(record["sessionId"], focus=False, open_new=False)

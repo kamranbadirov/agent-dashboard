@@ -23,6 +23,7 @@ board/
     sessions.py      live and ended sessions, close an agent
     classify.py      which group an agent belongs to
     group.py         one tile for each ticket: group sessions by their main ticket
+    plain.py         "In plain words": Haiku explains a ticket simply; cached in plain.json
     store.py         dismissed.json and titles.json
     assets.py        repo images found in board/assets
     state.py         build_state(), the one function the board calls
@@ -49,7 +50,7 @@ board/
 - Repo logos come from `board/assets/<repo>.png`. To add a repo, add the file. Do not list repos in code.
 - The terminal board needs Python 3.10+ because of `textual-image`. Its dependencies are pinned in `requirements.txt` because `tui/widgets/repo_image.py` uses `textual-image` internals.
 - Terminal layout comes in whole rows and columns. Spacing in pixels (such as 8px) can only be matched sideways, not vertically.
-- `titles.json`, `dismissed.json`, `agents.json` and `terminals/` are local state and are gitignored.
+- `titles.json`, `dismissed.json`, `agents.json`, `plain.json` and `terminals/` are local state and are gitignored.
 - The work wizard (key `w` in the terminal board) runs the scripts of the root checkout (`ROOT_REPO`; when it is not set, the dashboard's parent folder if that is a root checkout, else `~/Documents/root`). Questions are data in `core/wizard/flows.py`; to add or change a question, change it there, not in `tui/`. Answers reach root only through its environment variable overrides (`BRANCH`, `BACKEND`, `PRS`, `PLATFORM`, ...). Commands are argv lists, never shell strings. The repo list is read from root's `scripts/_lib.sh`, not copied.
 - tmux hosts the agents that the board starts. Each agent is one tmux session on the private socket `agent-board`. The board starts tmux with `core/tmux.conf`.
 - Every agent the board starts runs in board tmux, also with "In a new Rex tab" or "In another terminal". That choice only opens one more view, which runs `tmux attach`.
@@ -71,6 +72,8 @@ The tile follows "option C": a colored rail on the left, then title and time, th
 A tile is a ticket. The sessions whose main ticket is the same share one tile (`core/group.py`). The main ticket is the first one found: the platform's branch, then the transcript, then the PR titles. The tile shows the most urgent status of its sessions and "N sessions", and it has no ✎ ✕. A session with no ticket keeps a tile of its own.
 
 The side panel starts with the title, then one quiet row of actions with their keys (`⏎ Open  p PR  t Ticket  n Rename  x Stop`). There is no red button. "Stop" reads "Dismiss" for an ended session. For a ticket, the panel lists its sessions as numbered rows. `1` to `9` or a click picks and opens one, and the actions apply to the picked session. Enter opens the lead session: the most urgent live one, else the newest.
+
+Under the action row, "In plain words" explains the tile's main ticket for a newcomer: the big picture (the parent project's goal), what it is, why it matters, and done when. Haiku writes it with the Linear tools (`claude -p`), in a thread. "Where it stands" is the first two sentences of the lead session's recap, with no model call. The text is saved in `plain.json`. When you view a ticket whose last check is over `PLAIN_RECHECK_SECONDS` old (1 hour), Haiku gets the saved `updatedAt` and returns "unchanged" or new text. `u` reads the ticket again now. Linear has no API key here, so only Claude can see a change. Outside Rex, a board agent's panel shows its terminal, so the block shows only for other tiles.
 
 ## Git
 

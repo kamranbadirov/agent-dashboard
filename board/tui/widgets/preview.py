@@ -2,6 +2,7 @@ from rich.text import Text
 from textual.containers import Vertical, VerticalScroll
 from textual.widgets import Static
 
+from ...core import plain
 from ..format import ago, chips, pr_badges
 from ..jobs_view import job_text
 from ..theme import AQUA, COLOR, GRAY, INK, MUTED, NAME
@@ -75,6 +76,30 @@ class SessionRow(Static):
         self.app.action_pick(self.index)
 
 
+PLAIN_PARTS = [("big_picture", "Big picture"), ("what", "What it is"), ("why", "Why it matters"), ("done_when", "Done when")]
+
+
+def plain_block(ticket, target):
+    entry, error, busy = plain.cached(ticket)
+    t = Text()
+    t.append("In plain words", style=f"bold {AQUA}")
+    if busy and entry:
+        t.append("   checking for changes…", style=MUTED)
+    t.append("\n")
+    if not entry:
+        t.append(f"Could not read {ticket}: {error}. Press u to try again.\n" if error else f"Reading {ticket}…\n", style=MUTED)
+    else:
+        for field, label in PLAIN_PARTS:
+            if entry["text"].get(field):
+                t.append(f"{label}\n", style=f"bold {INK}")
+                t.append(f"{entry['text'][field]}\n", style=INK)
+    stands = plain.where_it_stands(target)
+    if stands:
+        t.append("Where it stands\n", style=f"bold {INK}")
+        t.append(f"{stands}\n", style=INK)
+    return t
+
+
 def details(s, prs):
     t = Text()
     meta = "   ".join(v for v in [s.get("name"), s.get("gitBranch")] if v)
@@ -109,6 +134,7 @@ class Preview(VerticalScroll):
     def compose(self):
         yield Static(id="preview-head")
         yield ActionBar(id="preview-actions")
+        yield Static(id="preview-plain")
         yield Vertical(id="preview-sessions")
         yield Static(id="preview-body")
 
@@ -118,9 +144,11 @@ class Preview(VerticalScroll):
         rows = self.query_one("#preview-sessions", Vertical)
         rows.remove_children()
         self.query_one(ActionBar).show(list(actions) if tile else [])
+        plain_view = self.query_one("#preview-plain", Static)
         if not tile:
             head.update(Text("Nothing selected.", style=MUTED))
             body.update("")
+            plain_view.display = False
             return
         target = target or tile
         t = Text()
@@ -132,6 +160,9 @@ class Preview(VerticalScroll):
             t.append_text(chips(tile["tickets"][:3]))
         head.update(t)
         group = tile.get("group")
+        plain_view.display = bool(tile["tickets"])
+        if tile["tickets"]:
+            plain_view.update(plain_block(tile["tickets"][0], tile.get("lead") or target))
         if group:
             rows.mount(Static(Text(f"Sessions  {len(group)}", style=f"bold {INK}"), classes="section"))
             rows.mount_all([SessionRow(i, s, s is target) for i, s in enumerate(group[:MAX_ROWS])])
