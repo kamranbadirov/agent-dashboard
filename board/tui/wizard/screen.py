@@ -255,7 +255,8 @@ class WizardScreen(ModalScreen):
         self.head(f"Ready to {VERBS[self.flow.key].split()[0].lower()}", self.answers.get("_why") or self.flow.label,
                   *self.step_of(self.asked_count() + 1))
         word = self.flow.typed_confirm(self.answers) if self.flow.typed_confirm else None
-        summary = SummaryView(self.recap_rows(), build(self.flow.key, self.answers)[0], word)
+        note = self.flow.confirm_note(self.answers) if word and self.flow.confirm_note else None
+        summary = SummaryView(self.recap_rows(), build(self.flow.key, self.answers)[0], word, note)
         self.body(summary)
         self.summary_foot(False)
         self.run_checks()

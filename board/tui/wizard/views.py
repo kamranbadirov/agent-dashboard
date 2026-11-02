@@ -31,11 +31,12 @@ class RecapRow(Horizontal):
 class SummaryView(Vertical):
     """What was chosen, with an Edit link for each answer, the checks, and the command."""
 
-    def __init__(self, rows, command, typed_word):
+    def __init__(self, rows, command, typed_word, note=None):
         super().__init__()
         self.rows = rows
         self.command = command
         self.typed_word = typed_word
+        self.note = note
 
     def compose(self):
         with Vertical(id="recap"):
@@ -44,7 +45,7 @@ class SummaryView(Vertical):
         yield Static("Checks", classes="section")
         yield Static(Text("Checking…", style=MUTED), id="checks")
         if self.typed_word:
-            yield Callout(f"Some of these have uncommitted changes that will be lost. Type {self.typed_word} to confirm.", kind="warn")
+            yield Callout(self.note or f"Type {self.typed_word} to confirm.", kind="warn")
             yield Input(placeholder=self.typed_word, id="typed")
         yield Btn("▸ Show the command", "command", "ghost link", id="toggle-command")
         yield Static(describe(self.command), classes="code", id="command")

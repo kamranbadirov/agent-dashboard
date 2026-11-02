@@ -2,9 +2,10 @@ import re
 import subprocess
 from dataclasses import replace
 
-from .. import rexpane
+from .. import procs, rexpane
 from ..agents import installed_terminals
 from ..root import browser_port, platform_dir, platform_urls, platforms, repo_names, slugify
+from ..sessions import live_sessions
 from .infer import infer
 from .model import Flow, Option, Question
 from .preflight import shared_backend_up
@@ -62,19 +63,39 @@ def pr_options(answers):
 PR_DETAIL = {"finished": "PRs merged or closed, safe to clean", "open": "PR open", "none": "no PR"}
 
 
+def in_use(platform):
+    """What still runs in a platform: live agents in its folder, and its dev servers in board tmux."""
+    root = platform["path"].rstrip("/") + "/"
+    live = [s for s in live_sessions().values() if (s.get("cwd") or "").rstrip("/") + "/" == root or (s.get("cwd") or "").startswith(root)]
+    running = [p for p in procs.listed() if p["key"] == procs.key_for("run", platform["name"]) and not p["dead"]]
+    found = [f"{len(live)} live agent{'s' if len(live) > 1 else ''}"] if live else []
+    return found + (["dev servers running"] if running else [])
+
+
 def platform_options(answers):
     out = []
     for p in sorted(platforms(), key=lambda p: (p["prs"] != "finished", p["modified"])):
         detail = PR_DETAIL[p["prs"]] + " · " + ("own backend" if p["isolated"] else "shared backend")
         if p["dirty"]:
             detail += " · uncommitted in " + ", ".join(p["dirty"])
-        out.append(Option(p["name"], p["name"], detail, badge="uncommitted" if p["dirty"] else ""))
+        busy = in_use(p)
+        if busy:
+            detail += " · " + ", ".join(busy)
+        badge = "uncommitted" if p["dirty"] else "in use" if busy else ""
+        out.append(Option(p["name"], p["name"], detail, badge=badge))
     return out
 
 
-def any_dirty(answers):
-    chosen = set(answers.get("platforms") or [])
-    return any(p["dirty"] for p in platforms() if p["name"] in chosen)
+def clean_note(answers):
+    chosen = [p for p in platforms() if p["name"] in set(answers.get("platforms") or [])]
+    lines = ["This deletes each worktree, its docker stack and its branches. It cannot be undone."]
+    for p in chosen:
+        if p["dirty"]:
+            lines.append(f"{p['name']} has uncommitted changes in {', '.join(p['dirty'])}. They will be lost.")
+        busy = in_use(p)
+        if busy:
+            lines.append(f"{p['name']} is in use: {', '.join(busy)}.")
+    return "\n".join(lines + [f"Type {DELETE_WORD} to confirm."])
 
 
 def browser_options(answers):
@@ -168,7 +189,7 @@ REVIEW = Flow("review", "Review pull requests", "Check out PR branches by ticket
 CLEAN = Flow("clean", "Clean up a platform", "Delete a worktree, its docker stack and its branches.",
              "make clean · under 1 min", [
     Question("platforms", "multi", "Which platforms?", "Select one or more to delete.", platform_options, validate=check_picked),
-], typed_confirm=lambda a: DELETE_WORD if any_dirty(a) else None)
+], typed_confirm=lambda a: DELETE_WORD, confirm_note=clean_note)
 
 def backend_options(answers):
     up = shared_backend_up()
