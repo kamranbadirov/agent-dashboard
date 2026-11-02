@@ -5,7 +5,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Rule, Static
 
-from ...core import agents, procs, ptyhost
+from ...core import procs, ptyhost
 from ...core.jobs import Busy
 from ...core.root import RootMissing
 from ...core.wizard import preflight
@@ -385,9 +385,7 @@ class WizardScreen(ModalScreen):
         view = ReadyView()
         self.body(view)
         meta = self.job.meta
-        opener = {"background": ("Open agent", "open_agent"),
-                  "terminal": (f"Open in {meta['terminal_app']}", "bring")}.get(meta["where"])
-        right = ([(*opener, "plain")] if meta["agent_prompt"] and opener else []) + [("Run dev servers", "servers", "primary")]
+        right = ([("Open agent", "open_agent", "plain")] if meta["agent_prompt"] else []) + [("Run dev servers", "servers", "primary")]
         self.foot([("Back to board", "close", "plain")], right)
         self.call_after_refresh(view.update_job, self.job)
         self.call_after_refresh(self.focus_first_action)
@@ -421,8 +419,6 @@ class WizardScreen(ModalScreen):
             self.dismiss(self.job)
         elif action == "open_agent":
             self.dismiss((self.job, "open_agent"))
-        elif action == "bring":
-            agents.bring_forward(self.job.meta["where"], self.job.meta["terminal_app"])
         elif action == "servers":
             self.run_servers()
 

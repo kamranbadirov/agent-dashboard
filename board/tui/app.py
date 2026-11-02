@@ -59,6 +59,7 @@ class Board(App):
         self.focused_id = None
         self.in_rex = rexpane.available()
         self.procs = []
+        self.alert_id = None
 
     def compose(self) -> ComposeResult:
         yield TopBar(id="top")
@@ -83,11 +84,23 @@ class Board(App):
         try:
             state = build_state()
             notify_new_commits(state)
-            notify_needs_you(state)
+            sent = notify_needs_you(state)
         except Exception as e:
             self.call_from_thread(self.notify, str(e), severity="error")
             return
         self.call_from_thread(self.apply_state, state)
+        if sent:
+            self.call_from_thread(setattr, self, "alert_id", sent[-1]["sessionId"])
+
+    def on_app_focus(self, event):
+        """After a click on a desktop alert brings the board to the front, select the agent that needs you."""
+        alert_id, self.alert_id = self.alert_id, None
+        if alert_id:
+            self.focused_id = alert_id
+            if self.focus_agent():
+                session = self.selected()
+                if session and self.tmux_record(session):
+                    self.open_agent(self.tmux_record(session)["sessionId"])
 
     @work(thread=True, exclusive=True, group="procs")
     def load_procs(self):
@@ -420,7 +433,8 @@ class Board(App):
             self.action_open_pr()
             return
         if s["alive"]:
-            self.notify(f"{s.get('name') or 'This agent'} is still running. Press o to open it.")
+            self.notify(f"{s.get('name') or 'This agent'} runs outside the board. Close it there, then press Enter here "
+                        "to resume it in the board.", timeout=8)
             return
         ok, message = agents.adopt_agent(s["sessionId"], s.get("cwd"), s["title"])
         if not ok:

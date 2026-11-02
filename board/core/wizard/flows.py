@@ -2,6 +2,7 @@ import re
 import subprocess
 from dataclasses import replace
 
+from .. import rexpane
 from ..agents import installed_terminals
 from ..root import browser_port, platform_dir, platform_urls, platforms, repo_names, slugify
 from .infer import infer
@@ -92,7 +93,7 @@ def terminal_options(answers):
 
 is_isolated = lambda a: a.get("backend") == "isolated"
 wants_agent = lambda a: a.get("agent") != "none"
-in_terminal = lambda a: a.get("where") == "terminal" and wants_agent(a)
+in_terminal = lambda a: a.get("where") == "terminal" and wants_agent(a) and not rexpane.available()
 
 BACKEND = Question("backend", "choice", "Which backend?", "Frontends always run. This decides what they talk to.", [
     Option("shared", "Shared backend", "Uses the pikachu already running. No extra RAM, no AWS."),
@@ -102,10 +103,16 @@ SEED = Question("seed", "choice", "Add demo data?", "Adds a QA event, an attende
     Option("no", "No", "Empty database copied from the shared one."),
     Option("yes", "Yes", "Add the demo event."),
 ], when=is_isolated)
-WHERE = Question("where", "choice", "Where should the agent run?", "You can move it later by resuming the session.", [
-    Option("background", "In the board", "No window. Select its tile to see the terminal in the right panel."),
-    Option("terminal", "In another terminal", "Opens the terminal app you pick."),
-], when=wants_agent)
+def where_options(answers):
+    if rexpane.available():
+        return [Option("background", "In the board", "Select its tile to see it in the pane beside the board."),
+                Option("terminal", "In a new Rex tab", "Also opens it in its own Rex tab. The board still shows it.")]
+    return [Option("background", "In the board", "No window. Select its tile to see the terminal in the right panel."),
+            Option("terminal", "In another terminal", "Also opens it in the terminal app you pick. The board still shows it.")]
+
+
+WHERE = Question("where", "choice", "Where should the agent run?", "It always runs in board tmux.", where_options,
+                 when=wants_agent)
 TERMINAL_APP = Question("terminal_app", "choice", "Which terminal app?", "", terminal_options, when=in_terminal)
 
 NEW_WORK = Flow("new", "Start new work", "New branch, a worktree of every repo, dependencies installed.",

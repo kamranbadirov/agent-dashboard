@@ -11,6 +11,8 @@ def action_reasons(info, prs, sess_status):
             reasons.append("answer question")
         else:
             reasons.append(f"approve {info['pendingTool']}")
+    elif sess_status == "waiting":
+        reasons.append(info.get("waitingFor") or "input needed")
     for p in prs:
         if p["state"] != "OPEN":
             continue

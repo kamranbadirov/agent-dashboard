@@ -91,6 +91,8 @@ def build_state():
         for k in dict.fromkeys(keys):
             if fetched.get(k):
                 prs.append(fetched[k])
+        waiting = (meta or {}).get("status") == "waiting"
+        info["waitingFor"] = (meta or {}).get("waitingFor") if waiting else None
         status, reasons = classify((meta or {}).get("status"), alive, info, prs)
         sessions.append(
             {
@@ -108,6 +110,8 @@ def build_state():
                 "lastUserPrompt": info.get("lastUserPrompt"),
                 "pendingTool": info.get("pendingTool"),
                 "pendingQuestion": info.get("pendingQuestion"),
+                "waitingFor": info["waitingFor"],
+                "waitingSince": (meta or {}).get("statusUpdatedAt") if waiting else None,
                 "lastActivity": info.get("lastActivity"),
                 "cwd": info.get("cwd") or (meta or {}).get("cwd"),
                 "gitBranch": info.get("gitBranch"),

@@ -65,6 +65,11 @@ def open_pane(key, focus):
     return False, "The pane opened, but tmux did not attach in it."
 
 
+def open_tab(key, title):
+    result = rex("window", "new", "-s", os.environ["REX_SESSION"], title[:40], "--json", "--", *ptyhost.attach_argv(key))
+    return result.returncode == 0, result.stderr.strip() or "Rex could not open a tab."
+
+
 def show(key, focus=False, open_new=True):
     """Show the tmux session `key` in the Rex pane beside the board. With open_new False,
     only switch a pane that is already open."""
