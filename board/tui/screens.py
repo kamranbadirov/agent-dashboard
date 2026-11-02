@@ -17,16 +17,18 @@ class ConfirmClose(ModalScreen):
     #dialog {{ width: 60; height: auto; padding: 1 2; background: #161b22; border: tall {RED}; }}
     """
 
-    def __init__(self, title):
+    def __init__(self, title, question="Close this agent?", verb="close"):
         super().__init__()
         self.agent_title = title
+        self.question = question
+        self.verb = verb
 
     def compose(self):
         t = Text()
-        t.append("Close this agent?\n\n", style=f"bold {INK}")
+        t.append(self.question + "\n\n", style=f"bold {INK}")
         t.append(self.agent_title + "\n\n", style=MUTED)
         t.append("y", style=f"bold {RED}")
-        t.append(" close   ", style=MUTED)
+        t.append(f" {self.verb}   ", style=MUTED)
         t.append("n", style=f"bold {INK}")
         t.append(" cancel", style=MUTED)
         yield Static(t, id="dialog")

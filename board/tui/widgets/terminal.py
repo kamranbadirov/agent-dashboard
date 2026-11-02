@@ -1,165 +1,91 @@
-import re
-
-import pyte
-from rich.style import Style
 from rich.text import Text
+from textual import work
 from textual.containers import Vertical
-from textual.widget import Widget
 from textual.widgets import Static
 
 from ...core import agents, ptyhost
 from ..jobs_view import PLACES
 from ..theme import GRAY, INK, MUTED
 
-REFRESH_SECONDS = 0.04
+POLL_SECONDS = 0.25
 LEAVE_KEY = "ctrl+right_square_bracket"
-MOVEMENT = {
-    "enter": b"\r", "escape": b"\x1b", "tab": b"\t", "shift+tab": b"\x1b[Z", "backspace": b"\x7f",
-    "delete": b"\x1b[3~", "up": b"\x1b[A", "down": b"\x1b[B", "right": b"\x1b[C", "left": b"\x1b[D",
-    "home": b"\x1b[H", "end": b"\x1b[F", "pageup": b"\x1b[5~", "pagedown": b"\x1b[6~",
-}
+ENDED = "This agent has ended. Press a key to resume it."
 
 
-# pyte drops the < > = that starts a private CSI sequence and runs the rest as the plain one, so
-# modifyOtherKeys (ESC[>4;2m) turns underline on and the kitty keyboard ones (ESC[>5u) move the cursor.
-PRIVATE_CSI = re.compile(rb"\x1b\[[<>=][0-9;:]*[ -/]*[@-~]")
-PARTIAL_CSI = re.compile(rb"\x1b(\[([<>=][0-9;:]*[ -/]*)?)?$")
-
-
-def strip_private_csi(data):
-    """The data without those sequences, and the unfinished one at its end, to put in front of the next chunk."""
-    data = PRIVATE_CSI.sub(b"", data)
-    tail = PARTIAL_CSI.search(data)
-    return (data[:tail.start()], data[tail.start():]) if tail else (data, b"")
-
-
-def to_bytes(event):
-    if event.key in MOVEMENT:
-        return MOVEMENT[event.key]
-    if event.key.startswith("ctrl+") and len(event.key) == 6 and event.key[-1].isalpha():
-        return bytes([ord(event.key[-1]) - 96])
-    if event.key.startswith("alt+") and event.character:
-        return b"\x1b" + event.character.encode()
-    return event.character.encode() if event.character else b""
-
-
-ANSI_NAMES = {"black", "red", "green", "blue", "magenta", "cyan", "white"}
-HEX_DIGITS = set("0123456789abcdefABCDEF")
-
-
-def rich_color(name):
-    """pyte names the 16 basic colours and gives every other colour as six hex digits."""
-    if name == "brown":
-        return "yellow"
-    base = name[len("bright"):] if name.startswith("bright") else name
-    if base in ANSI_NAMES:
-        return ("bright_" if base != name else "") + base
-    if len(name) == 6 and set(name) <= HEX_DIGITS:
-        return "#" + name
-    return None
-
-
-def cell_style(char, is_cursor):
-    return Style(
-        color=rich_color(char.fg), bgcolor=rich_color(char.bg), bold=char.bold, italic=char.italics,
-        underline=char.underscore, strike=char.strikethrough, reverse=char.reverse != is_cursor,
-    )
-
-
-class TerminalView(Widget, can_focus=True):
-    """Draws a program running in a pseudo-terminal and sends it the keys typed here. When the
-    program is not running, as after a board restart, the saved output is shown and the first
-    key resumes it."""
-
+class TerminalView(Static, can_focus=True):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.key = None
-        self.pty = None
-        self.seen = 0
-        self.pending = b""
-        self.dirty = False
-        self.emulator = pyte.Screen(100, 30)
-        self.stream = pyte.ByteStream(self.emulator)
+        self.screen_text = None
+        self.running = False
 
     def on_mount(self):
-        self.set_interval(REFRESH_SECONDS, self.poll)
+        self.set_interval(POLL_SECONDS, self.poll)
 
     def show(self, session_id):
-        self.key = session_id
-        self.pty = ptyhost.get(session_id)
-        self.emulator.reset()
-        self.seen = 0
-        self.pending = b""
-        if self.pty:
-            self.pty.resize(self.emulator.lines, self.emulator.columns)
-        else:
-            self.feed(ptyhost.history(session_id))
-        self.dirty = True
-
-    @property
-    def running(self):
-        return bool(self.pty and self.pty.alive)
-
-    def feed(self, data):
-        data, self.pending = strip_private_csi(self.pending + data)
-        self.stream.feed(data)
+        if session_id != self.key:
+            self.key = session_id
+            self.screen_text = None
+        if not ptyhost.available():
+            self.update(Text(ptyhost.MISSING, style=MUTED))
+            return
+        self.poll()
 
     def poll(self):
-        if self.pty:
-            data, self.seen = self.pty.buffer.read_since(self.seen)
-            if data:
-                self.feed(data)
-                self.dirty = True
-        if self.dirty:
-            self.dirty = False
-            self.refresh()
+        if self.key and self.parent.display and self.size.height > 0 and ptyhost.available():
+            self.capture(self.key, self.size.height, self.size.width)
+
+    @work(thread=True, exclusive=True, group="capture")
+    def capture(self, key, rows, cols):
+        screen = ptyhost.capture(key, rows, cols)
+        self.app.call_from_thread(self.draw, key, screen)
+
+    def draw(self, key, screen):
+        if key != self.key:
+            return
+        was_running, self.running = self.running, screen is not None
+        if was_running != self.running:
+            self.parent.update_header()
+        if screen == self.screen_text and self.screen_text is not None:
+            return
+        self.screen_text = screen
+        self.update(Text.from_ansi(screen, no_wrap=True, overflow="crop") if screen is not None else Text(ENDED, style=MUTED))
 
     def on_resize(self, event):
-        rows, cols = max(2, event.size.height), max(10, event.size.width)
-        self.emulator.resize(rows, cols)
-        if self.pty:
-            self.pty.resize(rows, cols)
-        self.dirty = True
+        if event.size.height > 0 and event.size.width > 0:
+            ptyhost.set_size(event.size.height, event.size.width)
+        self.poll()
 
     def check_consume_key(self, key, character):
-        return True
+        return key == "enter" or bool(character and character.isprintable())
 
     def on_key(self, event):
-        event.stop()
-        event.prevent_default()
         if event.key == LEAVE_KEY:
+            event.stop()
             self.app.leave_terminal()
             return
-        if not self.running:
-            self.resume()
+        if event.key != "enter" and not event.is_printable:
             return
-        self.pty.write(to_bytes(event))
+        event.stop()
+        event.prevent_default()
+        self.open(event.character if event.is_printable else None)
 
-    def on_paste(self, event):
-        if self.running:
-            self.pty.write(event.text.encode())
-
-    def resume(self):
-        self.pty = agents.resume_agent(self.key)
-        self.seen = 0
-        self.pending = b""
-        if self.pty:
-            self.emulator.reset()
-            self.pty.resize(self.emulator.lines, self.emulator.columns)
-            self.dirty = True
+    def open(self, text=None):
+        if not ptyhost.available():
+            self.app.notify(ptyhost.MISSING, severity="error")
+            return
+        if not ptyhost.alive(self.key):
+            ok, message = agents.resume_agent(self.key)
+            if not ok:
+                self.app.notify(message, severity="error")
+                return
+        elif text:
+            ptyhost.send_text(self.key, text)
+        with self.app.suspend():
+            ptyhost.attach(self.key)
+        self.screen_text = None
+        self.poll()
         self.parent.update_header()
-
-    def render(self):
-        screen = self.emulator
-        cursor_at = (screen.cursor.y, screen.cursor.x) if self.has_focus and not screen.cursor.hidden else None
-        lines = []
-        for y in range(screen.lines):
-            line = Text(no_wrap=True, overflow="crop")
-            for x in range(screen.columns):
-                char = screen.buffer[y][x]
-                line.append(char.data or " ", style=cell_style(char, cursor_at == (y, x)))
-            lines.append(line)
-        return Text("\n").join(lines)
 
 
 class AgentTerminal(Vertical):
@@ -189,7 +115,7 @@ class AgentTerminal(Vertical):
             return
         record, session = self.record, self.session or {}
         running = self.view.running
-        hint = "ctrl+] leave" if running else "press a key to resume"
+        hint = "enter attach · ctrl+] leave" if running else "press a key to resume"
         width = max(20, self.size.width - 4)
         title = Text(no_wrap=True)
         title.append("● " if running else "○ ", style=INK if running else GRAY)

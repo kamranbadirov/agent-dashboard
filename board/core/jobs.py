@@ -8,6 +8,7 @@ from collections import deque
 
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 STEP_MARK = "▎"
+WARN_MARK = "! "
 LOG_LINES = 200
 
 _jobs = {}
@@ -33,6 +34,7 @@ class Job:
         self.state = "running"
         self.steps = []
         self.log = deque(maxlen=LOG_LINES)
+        self.warnings = []
         self.started = time.time()
         self.reported = False
         self.notice = None  # a follow-up result worth showing, such as the agent failing to start
@@ -58,6 +60,8 @@ class Job:
             line = ANSI_RE.sub("", raw).rstrip()
             if line.startswith(STEP_MARK):
                 self.steps.append(line.lstrip(STEP_MARK).strip())
+            elif line.strip().startswith(WARN_MARK):
+                self.warnings.append(line.strip()[len(WARN_MARK):])
             self.log.append(line)
 
     def run_command(self, command):

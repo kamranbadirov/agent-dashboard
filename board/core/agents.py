@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import ptyhost
+from . import ptyhost, rexpane
 from .cache import JsonFile
 from .config import AGENT_COMMAND, AGENTS_FILE, TERMINALS_DIR
 from .root import read_env
@@ -35,9 +35,10 @@ def record_for(session_id):
 
 
 def board_agent(session_id):
-    """The record of an agent this board started in its own terminal, or None."""
+    """The record of an agent that runs in board tmux, or None. An agent started in another terminal
+    before agents always ran in tmux has no "tmux" key, so it is not one."""
     record = record_for(session_id)
-    return record if record and record["where"] == BACKGROUND else None
+    return record if record and (record["where"] == BACKGROUND or record.get("tmux")) else None
 
 
 def agent_argv(record, resume):
@@ -55,45 +56,43 @@ def launch_in_terminal(key, cwd, argv, app):
     return subprocess.run(["open", "-a", app, str(script)], capture_output=True, text=True)
 
 
-def run_dev_servers(platform, where, app):
+def open_elsewhere(record):
+    """Show a board agent in a new Rex tab, or in the terminal app the user picked. The agent stays in
+    board tmux, so the board can still show it."""
+    key = record["sessionId"]
+    if rexpane.available():
+        return rexpane.open_tab(key, record["title"])
     try:
-        result = launch_in_terminal(f"run-{os.path.basename(platform)}", platform, ["make", "run"],
-                                    app if where == TERMINAL and app else "Terminal")
+        result = launch_in_terminal(key, record["cwd"], ptyhost.attach_argv(key), record.get("terminalApp") or "Terminal")
     except OSError as e:
-        return False, f"Could not start the dev servers: {e}"
-    return result.returncode == 0, result.stderr.strip() or "Started."
-
-
-def bring_forward(where, app):
-    subprocess.run(["open", "-a", app or "Terminal"], capture_output=True)
+        return False, f"Could not open the terminal: {e}"
+    return result.returncode == 0, result.stderr.strip() or "Could not open the terminal."
 
 
 def start_agent(cwd, prompt, where, terminal_app=None, title="Agent", prs=None):
     if not os.path.isdir(cwd):
         return False, f"Cannot start the agent: {cwd} does not exist.", None
+    if where not in (BACKGROUND, TERMINAL):
+        return False, "Unknown place to run the agent.", None
     record = {
         "sessionId": str(uuid.uuid4()), "cwd": str(cwd), "prompt": prompt, "where": where, "title": title,
         "branch": read_env(Path(cwd) / ".worktree.env").get("BRANCH"), "prs": prs or [], "createdAt": datetime.now(timezone.utc).isoformat(),
+        "tmux": True, "terminalApp": terminal_app,
     }
-    argv = agent_argv(record, resume=False)
-    if where == BACKGROUND:
-        ptyhost.spawn(record["sessionId"], argv, record["cwd"])
-    elif where == TERMINAL:
-        try:
-            result = launch_in_terminal(record["sessionId"], record["cwd"], argv, terminal_app or "Terminal")
-        except OSError as e:
-            return False, f"Could not open the terminal: {e}", None
-    else:
-        return False, "Unknown place to run the agent.", None
-    if where != BACKGROUND and result.returncode != 0:
-        return False, result.stderr.strip() or "Could not open the terminal.", None
+    ok, message = ptyhost.spawn(record["sessionId"], agent_argv(record, resume=False), record["cwd"])
+    if not ok:
+        return False, message, None
     _registry.change(lambda data: data.__setitem__(record["sessionId"], record))
+    if where == TERMINAL:
+        ok, message = open_elsewhere(record)
+        if not ok:
+            return True, f"The agent started in the board, but {message[0].lower() + message[1:]}", record
     return True, "Agent started.", record
 
 
 def adopt_agent(session_id, cwd, title):
     if not cwd or not os.path.isdir(cwd):
-        return None
+        return False, "This session's folder no longer exists, so it cannot resume."
     record = {
         "sessionId": session_id, "cwd": str(cwd), "prompt": None, "where": BACKGROUND, "title": title,
         "branch": read_env(Path(cwd) / ".worktree.env").get("BRANCH"), "prs": [], "createdAt": datetime.now(timezone.utc).isoformat(),
@@ -105,5 +104,5 @@ def adopt_agent(session_id, cwd, title):
 def resume_agent(session_id):
     record = board_agent(session_id)
     if not record:
-        return None
+        return False, "This agent was not started by the board."
     return ptyhost.spawn(session_id, agent_argv(record, resume=True), record["cwd"])

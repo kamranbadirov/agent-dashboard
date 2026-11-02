@@ -4,7 +4,7 @@ A local board for Claude Code agents. It reads `~/.claude/` session files, asks 
 
 ## Commands
 
-- `make setup`: install gh, the icon font and Python 3.11, create `.venv`, install `requirements.txt`
+- `make setup`: install gh, tmux, the icon font and Python 3.11, create `.venv`, install `requirements.txt`
 - `make tui` (or `python3 server.py`): terminal board
 - `python3 server.py --json`: print the state once, useful to check a change in `core/`
 - `.venv/bin/python -m pyflakes board`: lint (install pyflakes in the venv first)
@@ -26,15 +26,18 @@ board/
     assets.py        repo images found in board/assets
     state.py         build_state(), the one function the board calls
     notify.py        desktop notifications for new commits and for agents that need you
-    cache.py         ring buffer, JSON file saved in batches, batched log appender
+    cache.py         JSON file saved in batches
     root.py          find the root checkout, list its platforms
     jobs.py          run root's scripts in a thread, keep their steps and output
-    ptyhost.py       a program in a pseudo-terminal, with its output saved
-    agents.py        start and resume agents: in the board or in a terminal app
+    ptyhost.py       the tmux host: start, capture, resize and attach board agents
+    rexpane.py       inside Rex: show a board agent in a Rex pane beside the board
+    procs.py         programs in board tmux that are not agents: dev servers, the backend, check fixes
+    tmux.conf        the board's own tmux config; the user's ~/.tmux.conf never applies
+    agents.py        start and resume agents in board tmux; also open one in a Rex tab or a terminal app
     wizard/          the work wizard without UI: flows.py (questions), commands.py, preflight.py, prs.py, run.py
   tui/               terminal board (Textual)
     wizard/          the wizard screen and its inputs; it only renders core/wizard/flows.py
-    widgets/terminal.py   the typeable agent terminal in the right panel
+    widgets/terminal.py   outside Rex: the read-only agent preview in the right panel; a key attaches to tmux
   assets/            repo images
 ```
 
@@ -47,8 +50,18 @@ board/
 - Terminal layout comes in whole rows and columns. Spacing in pixels (such as 8px) can only be matched sideways, not vertically.
 - `titles.json`, `dismissed.json`, `agents.json` and `terminals/` are local state and are gitignored.
 - The work wizard (key `w` in the terminal board) runs the scripts of the root checkout (`ROOT_REPO`; when it is not set, the dashboard's parent folder if that is a root checkout, else `~/Documents/root`). Questions are data in `core/wizard/flows.py`; to add or change a question, change it there, not in `tui/`. Answers reach root only through its environment variable overrides (`BRANCH`, `BACKEND`, `PRS`, `PLATFORM`, ...). Commands are argv lists, never shell strings. The repo list is read from root's `scripts/_lib.sh`, not copied.
-- The wizard and the agent terminal use `pyte` (pinned) to draw the terminal. `AGENT_COMMAND` replaces `claude`, which is how to test with a fake agent.
-- Writes are cheap by design: terminal output is merged in memory and appended to disk in batches, and `agents.json` is saved once after a quiet moment through a temp file and rename (`core/cache.py`). Do not write to disk per chunk or per keystroke.
+- tmux hosts the agents that the board starts. Each agent is one tmux session on the private socket `agent-board`. The board starts tmux with `core/tmux.conf`.
+- Every agent the board starts runs in board tmux, also with "In a new Rex tab" or "In another terminal". That choice only opens one more view, which runs `tmux attach`.
+- An agent waits for you when its `~/.claude/sessions/<pid>.json` says `"status": "waiting"`. The transcript is not enough, because Claude Code writes a pending AskUserQuestion to it late. A click on the alert of a board agent brings the board's terminal app to the front (`BOARD_APP_ID`), and the board selects that agent.
+- A tmux session outlives the board. After a board restart, an agent with a live tmux session is still alive. The board does not start it again.
+- Inside Rex (`REX_SESSION` and `REX_BLOCK` set, `rex` on the PATH), the board shows agents in a Rex pane to its right. Enter or a click on a board agent opens the pane with `rex split`, and the pane runs `tmux attach`. Moving to another board agent runs `tmux switch-client` on that pane. It does not open a new pane. `ctrl+]` in the pane detaches and closes it. The right panel then shows only the preview.
+- Outside Rex, the right panel shows the agent. It reads `tmux capture-pane` every 250 ms in a thread, and only while the panel shows. Enter or a printable key on the panel suspends the board and runs `tmux attach`. `ctrl+]` detaches and goes back to the board.
+- Enter on an ended board agent starts `claude --resume` in tmux, then shows it.
+- Programs that may ask for input run in board tmux too, never in another terminal app: `make run` (dev servers), `make backend` and the fix for a failed check. Each one is a tmux session named `proc-<kind>-<name>`, and it shows as a tile. Its pane stays after the program exits (`remain-on-exit`), so you can read the output. `x` stops it.
+- `tmux pipe-pane` appends the agent's output to `terminals/<id>.log`. This `pipe-pane` command string is the one shell string, and `shlex.quote` quotes its path.
+- If `tmux` is missing, the panel shows one error. The board does not crash.
+- `AGENT_COMMAND` replaces `claude`. Use it to test with a fake agent.
+- Writes are cheap by design: tmux appends agent output to the log, and `agents.json` is saved once after a quiet moment through a temp file and rename (`core/cache.py`). Do not write to disk per chunk or per keystroke.
 
 ## Design
 

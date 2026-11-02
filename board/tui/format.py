@@ -24,7 +24,7 @@ def headline(s):
     if not reasons:
         return "Check the result"
     first = reasons[0]
-    if first == "answer question":
+    if first in ("answer question", "input needed"):
         return "Answer a question"
     if first == "agent finished":
         return "Check the result"

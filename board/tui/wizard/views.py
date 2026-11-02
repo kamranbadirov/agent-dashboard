@@ -31,11 +31,12 @@ class RecapRow(Horizontal):
 class SummaryView(Vertical):
     """What was chosen, with an Edit link for each answer, the checks, and the command."""
 
-    def __init__(self, rows, command, typed_word):
+    def __init__(self, rows, command, typed_word, note=None):
         super().__init__()
         self.rows = rows
         self.command = command
         self.typed_word = typed_word
+        self.note = note
 
     def compose(self):
         with Vertical(id="recap"):
@@ -44,7 +45,7 @@ class SummaryView(Vertical):
         yield Static("Checks", classes="section")
         yield Static(Text("Checking…", style=MUTED), id="checks")
         if self.typed_word:
-            yield Callout(f"Some of these have uncommitted changes that will be lost. Type {self.typed_word} to confirm.", kind="warn")
+            yield Callout(self.note or f"Type {self.typed_word} to confirm.", kind="warn")
             yield Input(placeholder=self.typed_word, id="typed")
         yield Btn("▸ Show the command", "command", "ghost link", id="toggle-command")
         yield Static(describe(self.command), classes="code", id="command")
@@ -71,12 +72,14 @@ class SummaryView(Vertical):
         text = Text()
         for i, r in enumerate(results):
             text.append("\n" if i else "")
-            text.append("✓ " if r["ok"] else "✕ ", style=GREEN if r["ok"] else RED)
+            mark, color = ("✓ ", GREEN) if r["ok"] else ("! ", AQUA) if r["warn"] else ("✕ ", RED)
+            text.append(mark, style=color)
             text.append(r["label"], style=INK)
             if not r["ok"]:
                 text.append(f"  →  {r['fix']}", style=MUTED)
         if recheck_seconds and not all(r["ok"] for r in results):
-            text.append(f"\n\nFix it in another terminal. The checks run again every {recheck_seconds} seconds.", style=MUTED)
+            how = "Press f to run the first fix in the board. " if any(not r["ok"] and r["run"] for r in results) else ""
+            text.append(f"\n\n{how}The checks run again every {recheck_seconds} seconds.", style=MUTED)
         self.query_one("#checks", Static).update(text if results else Text("Nothing to check.", style=MUTED))
 
 
@@ -92,7 +95,7 @@ class ProgressView(Vertical):
             return
         expected = job.meta.get("expected", [])
         seen = job.steps
-        shown = list(seen) + [step for step in expected if step not in seen]
+        shown = list(seen) + [step for step in expected if not any(s.startswith(step) for s in seen)]
         text = Text()
         for i, step in enumerate(shown):
             text.append("\n" if i else "")
@@ -117,12 +120,16 @@ class ProgressView(Vertical):
 
 class ReadyView(Vertical):
     def compose(self):
+        yield Callout(kind="warn", id="warnings")
         yield Static(classes="box", id="urls")
         yield Callout(id="agent-note")
 
     def update_job(self, job):
         if not self.query("#urls"):
             return
+        warnings = self.query_one("#warnings", Callout)
+        warnings.display = bool(job.warnings)
+        warnings.update("Root reported problems. Fix them before you rely on this platform:\n" + "\n".join(f"! {w}" for w in job.warnings))
         urls = job.meta["urls"]
         pairs = [(name, urls[name]) for name in ("raichu", "portals", "ditto", "pikachu")]
         self.query_one("#urls", Static).update(key_values(pairs + [("folder", job.meta["platform"])]))

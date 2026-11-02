@@ -32,11 +32,11 @@ def find_root_repo():
 
 ROOT_REPO = find_root_repo()
 AGENT_COMMAND = os.environ.get("AGENT_COMMAND", "claude")
+REX_APP_ID = "com.superlogical.rex"
+BOARD_APP_ID = os.environ.get("BOARD_APP_ID") or (REX_APP_ID if os.environ.get("REX_SESSION") else os.environ.get("__CFBundleIdentifier"))
 INFER_MODEL = os.environ.get("INFER_MODEL", "haiku")
 AGENTS_FILE = ROOT / "agents.json"
 TERMINALS_DIR = ROOT / "terminals"
-TERMINAL_BUFFER_BYTES = 256_000
-TERMINAL_LOG_FLUSH_SECONDS = 2
 JSON_WRITE_DELAY_SECONDS = 0.5
 
 TICKET_RE = re.compile(r"\b([A-Z]{2,6}-\d{1,5})\b")

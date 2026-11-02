@@ -34,6 +34,7 @@ The dashboard is a terminal board (TUI, a text interface that runs in the termin
 - Python 3.10 or newer (the terminal board uses `textual-image`)
 - [Claude Code](https://claude.com/claude-code)
 - [GitHub CLI](https://cli.github.com/), logged in with `gh auth login`
+- [tmux](https://github.com/tmux/tmux) (`brew install tmux`). It hosts the agents that the board starts.
 - macOS (the terminal board uses `open` to open links)
 
 ## Install
@@ -56,7 +57,7 @@ python3 server.py
 | Key | Action |
 |-----|--------|
 | `↑` `↓` / `j` `k` | Move between agents |
-| `Enter` | Resume the selected agent in the right half of the board. `ctrl+]` goes back to the tiles. |
+| `Enter` | Show the selected agent in the right half of the board. Press `Enter` or a printable key there to attach to the agent in tmux. `ctrl+]` detaches and goes back to the board. |
 | `o` | Open the session on claude.ai |
 | `p` | Open the first PR |
 | `t` | Open the first Linear ticket |
@@ -69,6 +70,21 @@ python3 server.py
 | `q` | Quit |
 
 The board refreshes every 20 seconds.
+
+### Agents in tmux
+
+The board starts each agent in its own tmux session.
+tmux uses a private socket (`agent-board`) and the board's own config (`board/core/tmux.conf`).
+Your `~/.tmux.conf` does not apply.
+
+- The right half of the board shows the agent's screen. It does not take keys.
+- `Enter` or a printable key attaches your terminal to the agent. Your terminal draws it at full speed.
+- `ctrl+]` detaches and brings the board back.
+- The agent keeps running when you quit the board. The next board start finds it again.
+- A key on an ended agent resumes it with `claude --resume` and attaches at once.
+- tmux saves the agent's output in `terminals/<id>.log`.
+
+To see the sessions yourself, run `tmux -L agent-board ls`.
 
 ### Closing and removing agents
 

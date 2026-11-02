@@ -3,14 +3,16 @@ import json
 import shutil
 import subprocess
 
-from .config import NEEDS_YOU_FILE, NOTIFIED_FILE, NOTIFY_NEEDS_YOU
+from . import agents
+from .config import BOARD_APP_ID, NEEDS_YOU_FILE, NOTIFIED_FILE, NOTIFY_NEEDS_YOU
 from .github import my_login
 
 
-def send_notification(title, message, url, group):
+def send_notification(title, message, url, group, activate=None):
     if shutil.which("terminal-notifier"):
+        target = ["-activate", activate] if activate else ["-open", url] if url else []
         subprocess.run(
-            ["terminal-notifier", "-title", title, "-message", message, *(["-open", url] if url else []),
+            ["terminal-notifier", "-title", title, "-message", message, *target,
              "-group", group, "-sound", "default"],
             capture_output=True, timeout=10,
         )
@@ -53,12 +55,21 @@ def notify_new_commits(state):
 
 
 def notify_needs_you(state):
+    """Alert once for each wait. A click on the alert of a board agent brings the board to the front.
+    Returns the sessions it alerted for, newest last."""
     if not NOTIFY_NEEDS_YOU:
-        return
+        return []
     due = {}
     for s in state["sessions"]:
-        if s.get("alive") and not s.get("busy") and s.get("pendingTool"):
-            due[f"{s['sessionId']}@{s.get('lastActivity')}"] = s
-    for s in unseen(NEEDS_YOU_FILE, due):
-        what = "has a question for you" if s.get("pendingQuestion") else f"waits for you to approve {s['pendingTool']}"
-        send_notification(s["title"], f"The agent {what}.", s.get("remoteUrl"), s["sessionId"])
+        if s.get("alive") and not s.get("busy") and (s.get("pendingTool") or s.get("waitingFor")):
+            due[f"{s['sessionId']}@{s.get('waitingSince') or s.get('lastActivity')}"] = s
+    sent = unseen(NEEDS_YOU_FILE, due)
+    for s in sent:
+        if s.get("pendingTool") and not s.get("pendingQuestion"):
+            what = f"waits for you to approve {s['pendingTool']}"
+        else:
+            what = "has a question for you"
+        in_board = agents.board_agent(s["sessionId"]) is not None
+        send_notification(s["title"], f"The agent {what}.", s.get("remoteUrl"), s["sessionId"],
+                          BOARD_APP_ID if in_board else None)
+    return sent

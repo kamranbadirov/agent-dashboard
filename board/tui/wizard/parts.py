@@ -1,4 +1,5 @@
 from rich.text import Text
+from textual.binding import Binding
 from textual.message import Message
 from textual.widgets import Static
 
@@ -31,8 +32,10 @@ class Callout(Static):
         super().__init__(text, classes=f"callout {kind}", **kwargs)
 
 
-class Btn(Static):
+class Btn(Static, can_focus=True):
     """A button drawn as a bordered row. kind is "plain", "primary", "ghost" or "danger"."""
+
+    BINDINGS = [Binding("enter,space", "press", "Press", show=False)]
 
     class Pressed(Message):
         def __init__(self, action):
@@ -45,4 +48,8 @@ class Btn(Static):
 
     def on_click(self, event):
         event.stop()
-        self.post_message(self.Pressed(self.action))
+        self.action_press()
+
+    def action_press(self):
+        if not self.disabled:
+            self.post_message(self.Pressed(self.action))

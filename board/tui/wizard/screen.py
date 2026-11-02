@@ -5,14 +5,14 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Rule, Static
 
-from ...core import agents
+from ...core import procs, ptyhost
 from ...core.jobs import Busy
 from ...core.root import RootMissing
 from ...core.wizard import preflight
-from ...core.wizard.commands import NEW_FLOWS, PLATFORM_FLOWS, build
+from ...core.wizard.commands import IN_TMUX_FLOWS, NEW_FLOWS, PLATFORM_FLOWS, build
 from ...core.wizard.flows import FLOWS
 from ...core.wizard.model import Option, Question, options_for
-from ...core.wizard.run import launch
+from ...core.wizard.run import launch, launch_in_tmux
 from ..theme import MUTED
 from .inputs import Changed, Submitted, make_input
 from .parts import Btn, crumbs
@@ -42,6 +42,7 @@ class WizardScreen(ModalScreen):
         Binding("enter", "confirm", "Confirm", show=False),
         Binding("r", "recheck", "Re-check", show=False),
         Binding("c", "toggle_command", "Command", show=False),
+        Binding("f", "fix", "Fix", show=False),
     ]
     DEFAULT_CSS = WIZARD_CSS
 
@@ -55,6 +56,7 @@ class WizardScreen(ModalScreen):
         self.question = MENU
         self.phase = "question"
         self.checks_ok = False
+        self.results = []
         self.job = None
         self.tick = 0
         self.failed_footer = False
@@ -253,11 +255,16 @@ class WizardScreen(ModalScreen):
         self.head(f"Ready to {VERBS[self.flow.key].split()[0].lower()}", self.answers.get("_why") or self.flow.label,
                   *self.step_of(self.asked_count() + 1))
         word = self.flow.typed_confirm(self.answers) if self.flow.typed_confirm else None
-        summary = SummaryView(self.recap_rows(), build(self.flow.key, self.answers)[0], word)
+        note = self.flow.confirm_note(self.answers) if word and self.flow.confirm_note else None
+        summary = SummaryView(self.recap_rows(), build(self.flow.key, self.answers)[0], word, note)
         self.body(summary)
-        kind = "danger" if self.flow.key == "clean" else "primary"
-        self.foot([("Back", "back", "ghost")], [(VERBS[self.flow.key], "create", kind, {"id": "create", "disabled": True})])
+        self.summary_foot(False)
         self.run_checks()
+
+    def summary_foot(self, can_fix):
+        kind = "danger" if self.flow.key == "clean" else "primary"
+        fix = [("Run fix  f", "fix", "plain")] if can_fix else []
+        self.foot([("Back", "back", "ghost")], fix + [(VERBS[self.flow.key], "create", kind, {"id": "create", "disabled": True})])
 
     @work(thread=True, exclusive=True)
     def run_checks(self):
@@ -267,15 +274,44 @@ class WizardScreen(ModalScreen):
     def show_checks(self, results):
         if self.phase != "summary":
             return
-        self.checks_ok = all(r["ok"] for r in results)
+        self.results = results
+        self.checks_ok = preflight.passed(results)
         self.query_one(SummaryView).show_checks(results, RECHECK_SECONDS)
+        can_fix = bool(preflight.fixable(results))
+        if can_fix != bool(self.query("#wizard-foot Btn").filter(".plain")):
+            self.summary_foot(can_fix)
         self.update_create()
-        if not self.checks_ok:
+        if not all(r["ok"] for r in results):
             self.set_timer(RECHECK_SECONDS, self.recheck_failed)
 
     def recheck_failed(self):
-        if self.phase == "summary" and not self.checks_ok:
+        if self.phase == "summary" and not all(r["ok"] for r in self.results):
             self.run_checks()
+
+    def action_fix(self):
+        found = preflight.fixable(self.results) if self.phase == "summary" else None
+        if found:
+            self.run_fix(found)
+
+    @work(thread=True, exclusive=True, group="fix")
+    def run_fix(self, found):
+        try:
+            ok, message, key = procs.start("fix", found["label"], found["run"], preflight.fix_cwd())
+        except RootMissing as e:
+            ok, message, key = False, str(e), None
+        if not ok:
+            self.app.call_from_thread(self.notify, message, severity="error")
+            return
+        self.app.call_from_thread(self.show_fix, key)
+
+    def show_fix(self, key):
+        self.app.load_procs()
+        if self.app.in_rex:
+            self.app.show_in_pane(key, focus=True, open_new=True)
+            return
+        with self.app.suspend():
+            ptyhost.attach(key)
+        self.run_checks()
 
     def update_create(self):
         summary = self.query_one(SummaryView)
@@ -297,6 +333,9 @@ class WizardScreen(ModalScreen):
     # running
 
     def create(self):
+        if self.flow.key in IN_TMUX_FLOWS:
+            self.create_in_tmux()
+            return
         try:
             self.job = launch(self.flow.key, self.answers)
         except (Busy, RootMissing) as e:
@@ -310,6 +349,17 @@ class WizardScreen(ModalScreen):
         self.failed_footer = False
         self.call_after_refresh(self.show_progress)
 
+    @work(thread=True, exclusive=True)
+    def create_in_tmux(self):
+        try:
+            ok, message, key = launch_in_tmux(self.flow.key, self.answers)
+        except RootMissing as e:
+            ok, message = False, str(e)
+        if not ok:
+            self.app.call_from_thread(self.notify, message, severity="error")
+            return
+        self.app.call_from_thread(self.dismiss, (None, "open_proc", key))
+
     def show_progress(self):
         self.query_one(ProgressView).update_job(self.job, self.tick)
 
@@ -318,6 +368,9 @@ class WizardScreen(ModalScreen):
         if self.phase == "progress":
             self.show_progress()
             self.set_enabled("continue", self.job.state == "done")
+            if self.job.state != "running":
+                self.head("Done. Press Enter to continue." if self.job.state == "done" else "Failed. The output shows why.",
+                          self.job.label, *self.step_of(self.asked_count() + 2))
             if self.job.state == "failed" and not self.failed_footer:
                 self.failed_footer = True
                 self.foot([("Hide", "hide", "ghost")], [("Close", "close", "plain")])
@@ -326,17 +379,22 @@ class WizardScreen(ModalScreen):
 
     def show_ready(self):
         self.phase = "ready"
-        self.head(f"{self.job.label} is ready", "All repos are on your branch." if self.flow.key in NEW_FLOWS
+        warned = " with warnings" if self.job.warnings else ""
+        self.head(f"{self.job.label} is ready{warned}", "All repos are on your branch." if self.flow.key in NEW_FLOWS
                   else "Real PR branches are checked out, so a push goes to the PR.",
                   *self.step_of(self.asked_count() + 3))
         view = ReadyView()
         self.body(view)
         meta = self.job.meta
-        opener = {"background": ("Open agent", "open_agent"),
-                  "terminal": (f"Open in {meta['terminal_app']}", "bring")}.get(meta["where"])
-        right = ([(*opener, "plain")] if meta["agent_prompt"] and opener else []) + [("Run dev servers", "servers", "primary")]
+        right = ([("Open agent", "open_agent", "plain")] if meta["agent_prompt"] else []) + [("Run dev servers", "servers", "primary")]
         self.foot([("Back to board", "close", "plain")], right)
         self.call_after_refresh(view.update_job, self.job)
+        self.call_after_refresh(self.focus_first_action)
+
+    def focus_first_action(self):
+        buttons = [b for b in self.query("#wizard-foot Btn") if b.action != "close"]
+        if buttons:
+            buttons[0].focus()
 
     def advance(self):
         if self.phase == "progress" and self.job.state == "done":
@@ -356,20 +414,22 @@ class WizardScreen(ModalScreen):
              "continue": self.action_confirm, "recheck": self.action_recheck}[action]()
         elif action == "command":
             self.action_toggle_command()
+        elif action == "fix":
+            self.action_fix()
         elif action in ("hide", "close"):
             self.dismiss(self.job)
         elif action == "open_agent":
             self.dismiss((self.job, "open_agent"))
-        elif action == "bring":
-            agents.bring_forward(self.job.meta["where"], self.job.meta["terminal_app"])
         elif action == "servers":
             self.run_servers()
 
     @work(thread=True)
     def run_servers(self):
-        meta = self.job.meta
-        ok, message = agents.run_dev_servers(meta["platform"], meta["where"], meta["terminal_app"])
-        self.app.call_from_thread(self.notify, "Dev servers started." if ok else message, severity="information" if ok else "error")
+        ok, message, key = procs.start_dev_servers(self.job.meta["platform"])
+        if not ok:
+            self.app.call_from_thread(self.notify, message, severity="error")
+            return
+        self.app.call_from_thread(self.dismiss, (self.job, "open_proc", key))
 
     def action_confirm(self):
         if self.phase == "question":

@@ -1,6 +1,6 @@
-from .. import agents, jobs
+from .. import agents, jobs, procs
 from ..config import TICKET_RE
-from ..root import platform_urls
+from ..root import live_urls, platform_urls
 from .commands import NEW_FLOWS, PLATFORM_FLOWS, build, expected_steps, review_prs
 
 
@@ -27,13 +27,15 @@ def job_label(flow, answers):
     return {"backend": "Shared backend", "browser": "Shared browser"}[flow] + ": " + answers["action"]
 
 
-def start_agent_when_done(flow, answers, command):
-    prompt = agent_prompt(flow, answers)
-    if not prompt:
+def when_done(flow, answers, command):
+    if flow not in PLATFORM_FLOWS:
         return None
+    prompt = agent_prompt(flow, answers)
 
     def on_done(job):
         if job.state == "done":
+            job.meta["urls"] = live_urls(command.platform, job.meta["urls"])
+        if job.state == "done" and prompt:
             ok, message, record = agents.start_agent(
                 command.platform, prompt, answers["where"], answers.get("terminal_app"), job.label,
                 review_prs(answers) if flow == "review" else None)
@@ -48,12 +50,19 @@ def job_meta(flow, answers, command):
             "where": answers.get("where"), "terminal_app": answers.get("terminal_app")}
     if flow in PLATFORM_FLOWS:
         meta["platform"] = command.platform
-        meta["urls"] = platform_urls(command.slug, answers["backend"] == "isolated")
+        branch = answers["branch"] if flow in NEW_FLOWS else command.slug
+        meta["urls"] = platform_urls(branch, answers["backend"] == "isolated")
     return meta
+
+
+def launch_in_tmux(flow, answers):
+    """Run a flow whose script may ask for a password or a yes, such as make backend, in a board tmux session."""
+    command = build(flow, answers)[0]
+    return procs.start(flow, answers.get("action", flow), command.steps[0], command.cwd, command.env)
 
 
 def launch(flow, answers):
     commands = build(flow, answers)
     slug = "clean-" + commands[0].slug if flow == "clean" else commands[0].slug
-    return jobs.start(job_label(flow, answers), slug, commands, start_agent_when_done(flow, answers, commands[0]),
+    return jobs.start(job_label(flow, answers), slug, commands, when_done(flow, answers, commands[0]),
                       job_meta(flow, answers, commands[0]))

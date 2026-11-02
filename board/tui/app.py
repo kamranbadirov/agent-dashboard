@@ -9,12 +9,12 @@ from textual.binding import Binding
 from textual.containers import Horizontal, ItemGrid, Vertical, VerticalScroll
 from textual.widgets import Footer, Static
 
-from ..core import agents, jobs
+from ..core import agents, jobs, procs, ptyhost, rexpane
 from ..core.notify import notify_needs_you, notify_new_commits
 from ..core.sessions import close_session
 from ..core.state import build_state
 from ..core.store import dismiss_session, rename_session
-from .jobs_view import job_session, with_agent_record
+from .jobs_view import job_session, proc_session, with_agent_record
 from .screens import ConfirmClose, RenameTitle
 from .styles import APP_CSS
 from .theme import INK, MUTED, SECTIONS
@@ -57,6 +57,9 @@ class Board(App):
         self.show_inactive = False
         self.status_filter = None
         self.focused_id = None
+        self.in_rex = rexpane.available()
+        self.procs = []
+        self.alert_id = None
 
     def compose(self) -> ComposeResult:
         yield TopBar(id="top")
@@ -73,17 +76,42 @@ class Board(App):
         self.load()
         self.set_interval(REFRESH_SECONDS, self.load)
         self.set_interval(1, self.refresh_jobs)
+        self.set_interval(2, self.load_procs)
+        self.load_procs()
 
     @work(thread=True, exclusive=True)
     def load(self):
         try:
             state = build_state()
             notify_new_commits(state)
-            notify_needs_you(state)
+            sent = notify_needs_you(state)
         except Exception as e:
             self.call_from_thread(self.notify, str(e), severity="error")
             return
         self.call_from_thread(self.apply_state, state)
+        if sent:
+            self.call_from_thread(setattr, self, "alert_id", sent[-1]["sessionId"])
+
+    def on_app_focus(self, event):
+        """After a click on a desktop alert brings the board to the front, select the agent that needs you."""
+        alert_id, self.alert_id = self.alert_id, None
+        if alert_id:
+            self.focused_id = alert_id
+            if self.focus_agent():
+                session = self.selected()
+                if session and self.tmux_record(session):
+                    self.open_agent(self.tmux_record(session)["sessionId"])
+
+    @work(thread=True, exclusive=True, group="procs")
+    def load_procs(self):
+        found = procs.listed()
+        self.call_from_thread(self.apply_procs, found)
+
+    def apply_procs(self, found):
+        if found != self.procs:
+            self.procs = found
+            if self.state:
+                self.apply_state(self.state)
 
     def with_record(self, session):
         record = agents.record_for(session["sessionId"])
@@ -91,7 +119,7 @@ class Board(App):
 
     def listed(self):
         started = [self.with_record(s) for s in (self.state or {}).get("sessions", [])]
-        sessions = [job_session(j) for j in jobs.listed()] + started
+        sessions = [job_session(j) for j in jobs.listed()] + [proc_session(p) for p in self.procs] + started
         return [s for s in sessions if s["status"] not in ("ended", "done") or self.show_inactive]
 
     def visible(self):
@@ -145,6 +173,7 @@ class Board(App):
                            [(p["key"], p["state"], p["unresolvedThreads"], p["newComments"]) for p in s["prs"]])
                           for s in state["sessions"]]
                          + [(j.id, j.state, j.current_step) for j in jobs.listed()]
+                         + [(p["key"], p["dead"], p["exitCode"]) for p in self.procs]
                          + [self.show_inactive, self.status_filter])
         self.state = state
         self.render_top()
@@ -200,14 +229,49 @@ class Board(App):
             self.show_side(w.session)
             w.scroll_visible()
 
+    def tmux_record(self, session):
+        """What the terminal panel needs for a session that lives in board tmux: a board agent or a program."""
+        if not session:
+            return None
+        if session.get("proc"):
+            return {"sessionId": session["proc"]["key"], "title": session["title"], "where": "background"}
+        return agents.board_agent(session["sessionId"])
+
     def show_side(self, session):
-        record = session and agents.board_agent(session["sessionId"])
-        self.query_one("#terminal").display = bool(record)
-        self.query_one("#preview").display = not record
-        if record:
+        record = self.tmux_record(session)
+        if self.in_rex and record:
+            self.show_in_pane(record["sessionId"], focus=False, open_new=False)
+        in_panel = bool(record) and not self.in_rex
+        self.query_one("#terminal").display = in_panel
+        self.query_one("#preview").display = not in_panel
+        if in_panel:
             self.query_one(AgentTerminal).show(record, session)
         else:
             self.query_one(Preview).show(session)
+
+    @work(thread=True, exclusive=True, group="rexpane")
+    def show_in_pane(self, key, focus, open_new):
+        if not ptyhost.alive(key):
+            if not open_new:
+                return
+            ok, message = agents.resume_agent(key)
+            if not ok:
+                self.call_from_thread(self.notify, message, severity="error")
+                return
+        ok, message = rexpane.show(key, focus=focus, open_new=open_new)
+        if not ok:
+            self.call_from_thread(self.notify, message, severity="error")
+
+    def open_agent(self, session_id):
+        if self.in_rex:
+            self.show_in_pane(session_id, focus=True, open_new=True)
+        else:
+            self.query_one(AgentTerminal).focus_terminal()
+
+    def tile_clicked(self, session):
+        record = self.tmux_record(session)
+        if record:
+            self.open_agent(record["sessionId"])
 
     def selected(self):
         w = self.focused
@@ -259,7 +323,11 @@ class Board(App):
             self.notify("This session has no ticket.")
 
     def wizard_closed(self, result):
-        job, action = result if isinstance(result, tuple) else (result, None)
+        job, action, key = (tuple(result) + (None,))[:3] if isinstance(result, tuple) else (result, None, None)
+        if action == "open_proc" and key:
+            self.focused_id = f"proc:{key}"
+            self.load_procs()
+            self.open_agent(key)
         if job and job.state == "running":
             self.notify(f"Setting up {job.label}. Its tile shows the progress.")
         if action == "open_agent" and job.agent:
@@ -294,6 +362,20 @@ class Board(App):
     def action_close_agent(self):
         s = self.selected()
         if not s:
+            return
+        if s.get("proc"):
+            if s["proc"]["dead"]:
+                procs.stop(s["proc"]["key"])
+                self.load_procs()
+                return
+
+            def stop(confirmed):
+                if confirmed:
+                    ok, message = procs.stop(s["proc"]["key"])
+                    self.notify(message, severity="information" if ok else "warning")
+                    self.load_procs()
+
+            self.push_screen(ConfirmClose(s["title"], "Stop this program?", "stop"), stop)
             return
         if s["sessionId"].startswith("job:"):
             ok, message = jobs.dismiss(s["sessionId"][len("job:"):])
@@ -343,20 +425,23 @@ class Board(App):
         s = self.selected()
         if not s:
             return
-        if agents.board_agent(s["sessionId"]):
-            self.query_one(AgentTerminal).focus_terminal()
+        record = self.tmux_record(s)
+        if record:
+            self.open_agent(record["sessionId"])
             return
         if not s.get("resumeCmd"):
             self.action_open_pr()
             return
         if s["alive"]:
-            self.notify(f"{s.get('name') or 'This agent'} is still running. Press o to open it.")
+            self.notify(f"{s.get('name') or 'This agent'} runs outside the board. Close it there, then press Enter here "
+                        "to resume it in the board.", timeout=8)
             return
-        if not agents.adopt_agent(s["sessionId"], s.get("cwd"), s["title"]):
-            self.notify("This session's folder no longer exists, so it cannot resume.", severity="error")
+        ok, message = agents.adopt_agent(s["sessionId"], s.get("cwd"), s["title"])
+        if not ok:
+            self.notify(message, severity="error")
             return
         self.show_side(s)
-        self.query_one(AgentTerminal).focus_terminal()
+        self.open_agent(s["sessionId"])
 
 
 def main():
