@@ -28,7 +28,7 @@ PR_QUERY = """
 query($owner:String!,$repo:String!,$num:Int!){
   repository(owner:$owner,name:$repo){
     pullRequest(number:$num){
-      number title url state isDraft reviewDecision headRefName updatedAt
+      number title url state isDraft reviewDecision headRefName updatedAt closedAt
       author{login}
       comments(last:30){nodes{author{login} createdAt}}
       reviews(last:30){nodes{author{login} state submittedAt commit{oid}}}
@@ -117,6 +117,7 @@ def fetch_pr(owner, repo, num, stamp=None):
             "reviewers": sorted({(r.get("author") or {}).get("login") for r in reviews}),
             "checks": (last_commit.get("statusCheckRollup") or {}).get("state"),
             "updatedAt": pr.get("updatedAt"),
+            "closedAt": pr.get("closedAt"),
             "headOid": head,
             "commitsSinceReview": len(newer),
             "sinceReviewUrl": f"{pr['url']}/files/{base}..{head}" if newer and base and head else None,

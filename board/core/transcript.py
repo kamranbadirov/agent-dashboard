@@ -111,6 +111,7 @@ def parse_transcript(path):
         "summary": None,
         "lastAssistant": None,
         "lastUserPrompt": None,
+        "lastPromptAt": None,
         "firstPrompt": None,
         "lastActivity": None,
         "cwd": None,
@@ -163,6 +164,7 @@ def parse_transcript(path):
                 t = text_of(msg)
                 if t and not t.startswith("<"):
                     info["lastUserPrompt"] = t[:300]
+                    info["lastPromptAt"] = rec.get("timestamp")
                     pending.clear()
 
     if pending:

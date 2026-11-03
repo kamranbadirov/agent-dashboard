@@ -43,13 +43,21 @@ def is_review_agent(info, prs):
     return bool(prs) or "review" in (info.get("title") or "").lower()
 
 
+def parse_time(value):
+    return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
+
+
+def asked_after_close(info, prs):
+    asked = parse_time(info.get("lastPromptAt"))
+    closed = [parse_time(p.get("closedAt")) for p in prs]
+    return bool(asked) and all(closed) and asked > max(closed)
+
+
 def classify(sess_status, alive, info, prs):
     reasons = action_reasons(info, prs, sess_status)
     last = info.get("lastActivity")
-    stale = not last or (
-        datetime.now(timezone.utc) - datetime.fromisoformat(last.replace("Z", "+00:00"))
-    ).total_seconds() > STALE_HOURS * 3600
-    if prs and all(p["state"] in ("MERGED", "CLOSED") for p in prs):
+    stale = not last or (datetime.now(timezone.utc) - parse_time(last)).total_seconds() > STALE_HOURS * 3600
+    if prs and all(p["state"] in ("MERGED", "CLOSED") for p in prs) and not asked_after_close(info, prs):
         return "done", reasons
     if alive and sess_status == "busy":
         return "working", reasons
