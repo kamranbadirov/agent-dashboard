@@ -29,6 +29,10 @@ def registry():
     return _registry.data
 
 
+def forget(session_id):
+    _registry.change(lambda data: data.pop(session_id, None))
+
+
 def installed_terminals():
     return [name for name, path in TERMINAL_APPS.items() if os.path.exists(path)]
 

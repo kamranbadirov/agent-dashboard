@@ -1,9 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
-from . import agents
+from . import agents, ptyhost
 from .assets import repo_images
-from .classify import action_reasons, classify
+from .classify import action_reasons, classify, is_review_agent
 from .config import AUTO_CLOSE_MERGED, STARTING_GRACE_SECONDS
 from .github import fetch_pr, my_open_prs, reviewed_prs
 from .sessions import auto_close_merged, find_transcript, live_sessions, recent_ended
@@ -21,13 +21,23 @@ def session_tickets(found, prs, cwd, branch=None, created=()):
     return list(dict.fromkeys(out))[:4]
 
 
+def reviewed_ticket(prs):
+    firsts = [tickets_in(p.get("title") or "")[:1] for p in prs]
+    found = {t for f in firsts for t in f}
+    return list(found) if prs and all(firsts) and len(found) == 1 else []
+
+
 def starting_agents(known):
     """Agents the board started that have no transcript or session file. A new one would otherwise
-    be missing until it has written; one that never wrote stays as an ended tile until dismissed."""
+    be missing until it has written. One that exited before it wrote leaves the board."""
     now = datetime.now(timezone.utc)
+    running = {s["key"] for s in ptyhost.sessions() if not s["dead"]} if ptyhost.available() else None
     out = []
     for sid, record in list(agents.registry().items()):
         if sid in known:
+            continue
+        if running is not None and record.get("tmux") and sid not in running:
+            agents.forget(sid)
             continue
         started = datetime.fromisoformat(record["createdAt"])
         starting = (now - started).total_seconds() <= STARTING_GRACE_SECONDS
@@ -106,6 +116,10 @@ def build_state():
         waiting = (meta or {}).get("status") == "waiting"
         info["waitingFor"] = (meta or {}).get("waitingFor") if waiting else None
         status, reasons = classify((meta or {}).get("status"), alive, info, prs)
+        tickets = session_tickets(info["tickets"], prs, info.get("cwd") or (meta or {}).get("cwd"),
+                                  info.get("gitBranch"), set(info.get("createdPrs") or []))
+        if not tickets and is_review_agent(info, prs):
+            tickets = reviewed_ticket(prs)
         sessions.append(
             {
                 "sessionId": sid,
@@ -116,8 +130,7 @@ def build_state():
                 "status": status,
                 "reasons": reasons,
                 "title": info.get("title") or (info.get("firstPrompt") or "")[:80] or sid[:8],
-                "tickets": session_tickets(info["tickets"], prs, info.get("cwd") or (meta or {}).get("cwd"),
-                                           info.get("gitBranch"), set(info.get("createdPrs") or [])),
+                "tickets": tickets,
                 "summary": info.get("summary"),
                 "lastAssistant": (info.get("lastAssistant") or "")[-600:],
                 "lastUserPrompt": info.get("lastUserPrompt"),
