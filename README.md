@@ -64,7 +64,7 @@ python3 server.py
 | `x` | Close the selected agent, or remove an ended one |
 | `s` | Start work on a ticket. Type the ticket ID; Claude reads it in Linear and picks the branch, the backend and the mobile apps. You can change any of them before you start. |
 | `c` | Clean up platforms. Platforms whose PRs are all merged or closed come first. |
-| `n` | Start a new chat. It runs in `~/claude-chats` (set `CHAT_DIR` to change it), with no ticket, branch or platform. |
+| `n` | Start a new chat. It runs in the root checkout (set `CHAT_DIR` to change it), with no ticket, branch or platform. |
 | `R` | Rename the selected agent |
 | `w` | Open the work wizard: new work, PR review, clean up, the shared backend and the shared browser. |
 | `e` | Show or hide inactive and done agents |
@@ -120,7 +120,7 @@ Set these environment variables to change the defaults:
 | `ENDED_LOOKBACK_HOURS` | `72` | How far back to look for ended sessions. |
 | `NOTIFY_NEEDS_YOU` | `1` | Set to `0` to stop the desktop notification when an agent asks a question or waits for a tool approval. |
 | `INFER_MODEL` | `haiku` | The Claude model that reads a ticket when you press `s`. |
-| `CHAT_DIR` | `~/claude-chats` | The folder where `n` starts a new chat. It must not be a git repo. |
+| `CHAT_DIR` | the root checkout | The folder where `n` starts a new chat. If it is a git repo, keep it on a branch with no ticket ID. |
 | `AUTO_CLOSE_MERGED` | `0` | Set to `1` to let the dashboard close idle agents whose PRs are all merged or closed. |
 
 Example:
