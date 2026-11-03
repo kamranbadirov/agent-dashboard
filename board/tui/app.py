@@ -145,7 +145,15 @@ class Board(App):
             self.apply_state(self.state, force=True)
 
     def action_clear_filter(self):
+        if self.screen.query("HelpPanel"):
+            self.action_hide_help_panel()
+            return
         self.toggle_filter(None)
+
+    def get_system_commands(self, screen):
+        for command in super().get_system_commands(screen):
+            if command.title not in ("Maximize", "Minimize"):
+                yield command
 
     def render_top(self):
         counts = {}
