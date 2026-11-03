@@ -38,12 +38,13 @@ class Board(App):
         Binding("up,k,left,h", "move(-1)", "Move", show=False),
         Binding("s", "start_ticket", "Start ticket"),
         Binding("w", "wizard", "New work"),
+        Binding("n", "new_chat", "New chat"),
         Binding("c", "clean_platforms", "Clean up"),
         Binding("enter", "resume", "Open"),
         Binding("o", "open_session", "Open"),
         Binding("p", "open_pr", "PR"),
         Binding("t", "open_ticket", "Ticket"),
-        Binding("n", "rename_agent", "Rename"),
+        Binding("R", "rename_agent", "Rename"),
         Binding("x", "close_agent", "Close"),
         Binding("X", "close_done", "Close all done", show=False),
         Binding("e", "toggle_inactive", "Inactive"),
@@ -255,7 +256,7 @@ class Board(App):
         if session["tickets"]:
             out.append(("t", "Ticket", "open_ticket"))
         if target and not (target.get("job") or target.get("proc") or target["sessionId"].startswith("pr:")):
-            out.append(("n", "Rename", "rename_agent"))
+            out.append(("R", "Rename", "rename_agent"))
         if target:
             out.append(("x", "Stop" if target.get("alive") else "Dismiss", "close_agent"))
         return out
@@ -421,6 +422,25 @@ class Board(App):
 
     def action_start_ticket(self):
         self.push_screen(WizardScreen(start="ticket"), self.wizard_closed)
+
+    def action_new_chat(self):
+        self.new_chat_worker()
+
+    @work(thread=True, group="new_chat")
+    def new_chat_worker(self):
+        ok, message, record = agents.start_chat()
+        if not ok:
+            self.call_from_thread(self.notify, message, severity="error")
+            return
+        self.call_from_thread(self.chat_started, record["sessionId"])
+
+    def chat_started(self, session_id):
+        self.focused_id = session_id
+        self.load()
+        if self.in_rex:
+            self.open_agent(session_id)
+        else:
+            self.notify("Chat started. Its tile appears in a moment. Press Enter on it to type.")
 
     def action_clean_platforms(self):
         self.push_screen(WizardScreen(start="clean"), lambda result: self.refresh_jobs())

@@ -32,6 +32,7 @@ def find_root_repo():
 
 ROOT_REPO = find_root_repo()
 AGENT_COMMAND = os.environ.get("AGENT_COMMAND", "claude")
+CHAT_DIR = Path(os.environ.get("CHAT_DIR") or HOME / "claude-chats")
 REX_APP_ID = "com.superlogical.rex"
 BOARD_APP_ID = os.environ.get("BOARD_APP_ID") or (REX_APP_ID if os.environ.get("REX_SESSION") else os.environ.get("__CFBundleIdentifier"))
 INFER_MODEL = os.environ.get("INFER_MODEL", "haiku")
