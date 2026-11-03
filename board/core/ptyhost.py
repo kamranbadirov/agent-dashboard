@@ -111,6 +111,14 @@ def clients():
     return set(result.stdout.split()) if result.returncode == 0 else set()
 
 
+def client_tty(pid):
+    result = tmux("list-clients", "-F", "#{client_pid} #{client_tty}")
+    if result.returncode != 0 or not pid:
+        return None
+    return next((tty for client, tty in (line.split() for line in result.stdout.splitlines() if " " in line)
+                 if client == str(pid)), None)
+
+
 def switch_client(tty, key):
     release_size(key)
     return tmux("switch-client", "-c", tty, "-t", f"={key}").returncode == 0

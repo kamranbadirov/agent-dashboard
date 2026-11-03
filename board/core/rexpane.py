@@ -40,6 +40,14 @@ def pane_open(name=AGENT):
     return bool(pane["block"]) and pane["tty"] in ptyhost.clients() and pane["block"] in blocks()
 
 
+def block_pid(block):
+    result = rex("block", "call", "-s", os.environ["REX_SESSION"], "-b", block, "process", "{}")
+    try:
+        return (json.loads(result.stdout).get("child") or {}).get("pid")
+    except (ValueError, AttributeError):
+        return None
+
+
 def focus_pane(name=AGENT):
     rex("focus", "-s", os.environ["REX_SESSION"], _panes[name]["block"])
 
@@ -70,7 +78,6 @@ def close_stale(name):
 def open_pane(key, focus, name=AGENT):
     close_stale(name)
     split, ratio = LAYOUT[name]
-    before = ptyhost.clients()
     result = rex("split", "-s", os.environ["REX_SESSION"], "-b", anchor_for(name), f"--split={split}",
                  "--ratio", ratio, "--label", name, f"--focus={'true' if focus else 'false'}", "--json",
                  "--", *ptyhost.attach_argv(key))
@@ -82,9 +89,9 @@ def open_pane(key, focus, name=AGENT):
         return False, "Rex opened a pane but did not say which one."
     deadline = time.time() + CLIENT_WAIT_SECONDS
     while time.time() < deadline:
-        new = ptyhost.clients() - before
-        if new:
-            _panes[name].update(block=block, tty=new.pop())
+        tty = ptyhost.client_tty(block_pid(block))
+        if tty:
+            _panes[name].update(block=block, tty=tty)
             return True, ""
         time.sleep(0.1)
     _panes[name].update(block=block, tty=None)
