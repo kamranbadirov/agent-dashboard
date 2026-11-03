@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import ptyhost, rexpane
 from .cache import JsonFile
-from .config import AGENT_COMMAND, AGENTS_FILE, TERMINALS_DIR
+from .config import AGENT_COMMAND, AGENTS_FILE, CHAT_DIR, TERMINALS_DIR
 from .root import read_env
 from .sessions import close_session, live_sessions, pid_alive
 
@@ -92,6 +92,14 @@ def start_agent(cwd, prompt, where, terminal_app=None, title="Agent", prs=None):
         if not ok:
             return True, f"The agent started in the board, but {message[0].lower() + message[1:]}", record
     return True, "Agent started.", record
+
+
+def start_chat():
+    try:
+        CHAT_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        return False, f"Cannot create {CHAT_DIR}: {e}", None
+    return start_agent(str(CHAT_DIR), None, BACKGROUND, title="Chat")
 
 
 def adopt_agent(session_id, cwd, title):
