@@ -120,7 +120,7 @@ Set these environment variables to change the defaults:
 | `ENDED_LOOKBACK_HOURS` | `72` | How far back to look for ended sessions. |
 | `NOTIFY_NEEDS_YOU` | `1` | Set to `0` to stop the desktop notification when an agent asks a question or waits for a tool approval. |
 | `INFER_MODEL` | `haiku` | The Claude model that reads a ticket when you press `s`. |
-| `CHAT_DIR` | the root checkout | The folder where `n` starts a new chat. If it is a git repo, keep it on a branch with no ticket ID. |
+| `CHAT_DIR` | the root checkout | The folder where `n` starts a new chat. It must exist. If it is a git repo, keep it on a branch with no ticket ID. |
 | `AUTO_CLOSE_MERGED` | `0` | Set to `1` to let the dashboard close idle agents whose PRs are all merged or closed. |
 
 Example:

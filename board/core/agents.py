@@ -29,10 +29,6 @@ def registry():
     return _registry.data
 
 
-def forget(session_id):
-    _registry.change(lambda data: data.pop(session_id, None))
-
-
 def installed_terminals():
     return [name for name, path in TERMINAL_APPS.items() if os.path.exists(path)]
 
@@ -95,10 +91,8 @@ def start_agent(cwd, prompt, where, terminal_app=None, title="Agent", prs=None):
 
 
 def start_chat():
-    try:
-        CHAT_DIR.mkdir(parents=True, exist_ok=True)
-    except OSError as e:
-        return False, f"Cannot create {CHAT_DIR}: {e}", None
+    if not CHAT_DIR.is_dir():
+        return False, f"No folder at {CHAT_DIR}. Set CHAT_DIR or ROOT_REPO.", None
     return start_agent(str(CHAT_DIR), None, BACKGROUND, title="Chat")
 
 

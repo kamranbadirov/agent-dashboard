@@ -29,15 +29,13 @@ def reviewed_ticket(prs):
 
 def starting_agents(known):
     """Agents the board started that have no transcript or session file. A new one would otherwise
-    be missing until it has written. One that exited before it wrote leaves the board."""
+    be missing until it has written. One that exited before it wrote does not show."""
     now = datetime.now(timezone.utc)
-    running = {s["key"] for s in ptyhost.sessions() if not s["dead"]} if ptyhost.available() else None
+    pending = [(sid, record) for sid, record in list(agents.registry().items()) if sid not in known]
+    running = {s["key"] for s in ptyhost.sessions() if not s["dead"]} if pending and ptyhost.available() else None
     out = []
-    for sid, record in list(agents.registry().items()):
-        if sid in known:
-            continue
-        if running is not None and record.get("tmux") and sid not in running:
-            agents.forget(sid)
+    for sid, record in pending:
+        if running is not None and record.get("tmux") and sid not in running and not find_transcript(sid):
             continue
         started = datetime.fromisoformat(record["createdAt"])
         starting = (now - started).total_seconds() <= STARTING_GRACE_SECONDS
@@ -118,7 +116,7 @@ def build_state():
         status, reasons = classify((meta or {}).get("status"), alive, info, prs)
         tickets = session_tickets(info["tickets"], prs, info.get("cwd") or (meta or {}).get("cwd"),
                                   info.get("gitBranch"), set(info.get("createdPrs") or []))
-        if not tickets and is_review_agent(info, prs):
+        if not tickets and "review" in (info.get("title") or "").lower() and is_review_agent(info, prs):
             tickets = reviewed_ticket(prs)
         sessions.append(
             {
