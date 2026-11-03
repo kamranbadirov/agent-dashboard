@@ -51,7 +51,24 @@ def anchor_for(name):
     return os.environ["REX_BLOCK"]
 
 
+def close_stale(name):
+    """A pane left by an earlier board, after a crash: same label, same window as the board. The board does not
+    know its tmux client, so it closes the pane and opens a new one in its place."""
+    result = rex("block", "ls", "-s", os.environ["REX_SESSION"], "--json")
+    if result.returncode != 0:
+        return
+    try:
+        listed = json.loads(result.stdout).get("blocks", [])
+    except (ValueError, AttributeError):
+        return
+    window = next((b["window_id"] for b in listed if b["block_id"] == os.environ["REX_BLOCK"]), None)
+    for b in listed:
+        if b.get("label") == name and b.get("window_id") == window:
+            rex("block", "close", "-s", os.environ["REX_SESSION"], b["block_id"])
+
+
 def open_pane(key, focus, name=AGENT):
+    close_stale(name)
     split, ratio = LAYOUT[name]
     before = ptyhost.clients()
     result = rex("split", "-s", os.environ["REX_SESSION"], "-b", anchor_for(name), f"--split={split}",
