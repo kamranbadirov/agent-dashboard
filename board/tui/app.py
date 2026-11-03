@@ -14,9 +14,9 @@ from ..core import agents, jobs, plain, procs, ptyhost, rexpane
 from ..core.group import group
 from ..core.notify import notify_needs_you, notify_new_commits
 from ..core.root import RootMissing, root_dir
-from ..core.sessions import close_all, close_session, done_and_live
+from ..core.sessions import close_all, done_and_live
 from ..core.state import build_state
-from ..core.store import dismiss_session, rename_session
+from ..core.store import dismiss_session, rename_session, stop_session
 from .jobs_view import job_session, proc_session, with_agent_record
 from .screens import ConfirmClose, RenameTitle
 from .styles import APP_CSS
@@ -577,7 +577,7 @@ class Board(App):
 
     @work(thread=True)
     def close_worker(self, session_id):
-        ok, message = close_session(session_id)
+        ok, message = stop_session(session_id)
         self.call_from_thread(self.notify, message, severity="information" if ok else "error")
         self.call_from_thread(self.load)
 

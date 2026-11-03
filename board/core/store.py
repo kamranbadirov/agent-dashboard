@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 
 from .config import DISMISSED_FILE, TITLES_FILE
-from .sessions import live_sessions
+from .sessions import close_session, live_sessions
 
 
 def load_dismissed():
@@ -25,6 +25,13 @@ def dismiss_session(session_id):
     dismissed[session_id] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     DISMISSED_FILE.write_text(json.dumps(dismissed))
     return True, "Removed."
+
+
+def stop_session(session_id):
+    ok, message = close_session(session_id)
+    if ok:
+        dismiss_session(session_id)
+    return ok, message
 
 
 def load_titles():
