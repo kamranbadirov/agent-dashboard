@@ -11,7 +11,6 @@ def newest_first(sessions):
 
 
 def lead_of(sessions):
-    """The session Enter opens: the most urgent live one, else the newest."""
     live = [s for s in sessions if s.get("alive")]
     pool = live or sessions
     return min(newest_first(pool), key=rank)
@@ -53,8 +52,6 @@ def ticket_item(ticket, sessions):
 
 
 def group(sessions):
-    """One item for each main ticket. A ticket with one session, or a session with no ticket, stays as it is.
-    Items keep the order of their newest session."""
     by_ticket = {}
     order = []
     for s in sessions:

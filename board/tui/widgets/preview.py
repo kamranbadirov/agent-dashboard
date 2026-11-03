@@ -15,7 +15,6 @@ class SectionHeader(Static):
 
 
 class ActionBar(Static):
-    """One quiet row of the actions for the selected tile, each with its key. A click runs the action."""
 
     GAP = "   "
 
@@ -33,7 +32,6 @@ class ActionBar(Static):
         self.draw()
 
     def draw(self):
-        """Lay the actions out in rows that fit the panel, so none is cut off."""
         width = max(10, self.size.width or 60)
         lines, hits = [Text()], []
         for key, label, action in self.actions:

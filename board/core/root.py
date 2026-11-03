@@ -44,8 +44,6 @@ FRONTEND_DIRS = {"raichu": "raichu", "portals": "Charmander/portals", "ditto": "
 
 
 def platform_urls(branch, isolated):
-    """A guess before the platform exists. portless names a frontend after the last part of the branch,
-    and pikachu_api_host in root's _lib.sh names an isolated backend after the platform slug."""
     label = slugify(branch.rsplit("/", 1)[-1])
     urls = {name: f"https://{label}.{name}.localhost" for name in FRONTEND_DIRS}
     slug = slugify(branch)[: int(lib_value("DEV_HOST_LABEL_LENGTH") or 60)]
@@ -63,7 +61,6 @@ def portless_url(path, name):
 
 
 def live_urls(platform, guess):
-    """The URLs a platform really uses: the ones root wrote to .worktree.env, then portless, as root's frontend_url does."""
     platform = Path(platform)
     env = read_env(platform / ".worktree.env")
     urls = dict(guess)
@@ -97,7 +94,6 @@ def read_env(path):
 
 
 def platform_of(path):
-    """The platform folder that holds path, or None."""
     if not path:
         return None
     path = Path(path)

@@ -39,8 +39,6 @@ def record_for(session_id):
 
 
 def board_agent(session_id):
-    """The record of an agent that runs in board tmux, or None. An agent started in another terminal
-    before agents always ran in tmux has no "tmux" key, so it is not one."""
     record = record_for(session_id)
     return record if record and (record["where"] == BACKGROUND or record.get("tmux")) else None
 
@@ -61,8 +59,6 @@ def launch_in_terminal(key, cwd, argv, app):
 
 
 def open_elsewhere(record):
-    """Show a board agent in a new Rex tab, or in the terminal app the user picked. The agent stays in
-    board tmux, so the board can still show it."""
     key = record["sessionId"]
     if rexpane.available():
         return rexpane.open_tab(key, record["title"])
@@ -114,8 +110,6 @@ def adopt_agent(session_id, cwd, title):
 
 
 def move_into_board(session_id, cwd, title):
-    """Stop a session that runs in another terminal, then resume it in board tmux. It waits until the old
-    process has exited, so the session never runs twice."""
     meta = live_sessions().get(session_id)
     if meta and meta.get("status") == "busy":
         return False, "It is working right now. Try again when it is idle."
