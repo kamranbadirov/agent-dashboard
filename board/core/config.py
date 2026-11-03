@@ -9,7 +9,6 @@ ROOT = Path(__file__).resolve().parents[2]
 ASSETS_DIR = ROOT / "board" / "assets"
 ENDED_LOOKBACK_HOURS = int(os.environ.get("ENDED_LOOKBACK_HOURS", "72"))
 STARTING_GRACE_SECONDS = int(os.environ.get("STARTING_GRACE_SECONDS", "300"))
-STALE_HOURS = int(os.environ.get("STALE_HOURS", "24"))
 AUTO_CLOSE_MERGED = os.environ.get("AUTO_CLOSE_MERGED", "0") == "1"
 DISMISSED_FILE = ROOT / "dismissed.json"
 TITLES_FILE = ROOT / "titles.json"
