@@ -64,7 +64,6 @@ PR_DETAIL = {"finished": "PRs merged or closed, safe to clean", "open": "PR open
 
 
 def in_use(platform):
-    """What still runs in a platform: live agents in its folder, and its dev servers in board tmux."""
     root = platform["path"].rstrip("/") + "/"
     live = [s for s in live_sessions().values() if (s.get("cwd") or "").rstrip("/") + "/" == root or (s.get("cwd") or "").startswith(root)]
     running = [p for p in procs.listed() if p["key"] == procs.key_for("run", platform["name"]) and not p["dead"]]

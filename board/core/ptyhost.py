@@ -58,7 +58,6 @@ def kill(key):
 
 
 def sessions():
-    """Every tmux session on the board's socket: name, whether its program exited, its exit code, when it started."""
     result = tmux("list-sessions", "-F", "#{session_name}\t#{pane_dead}\t#{pane_dead_status}\t#{session_created}")
     if result.returncode != 0:
         return []

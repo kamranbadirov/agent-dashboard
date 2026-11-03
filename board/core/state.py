@@ -13,9 +13,6 @@ from .transcript import parse_transcript, tickets_in
 
 
 def session_tickets(found, prs, cwd, branch=None, created=()):
-    """The ticket of the platform the session runs in comes first, because it is the surest. Then the
-    tickets from the transcript. Then the tickets of PRs that are this session's own: PRs it opened, or
-    PRs on the branch it works on. A PR the session only links does not count. The first one is the main ticket."""
     own_branches = {b for b in (branch, platform_branch(cwd)) if b}
     out = tickets_in(platform_branch(cwd) or "") + list(found)
     for p in prs:

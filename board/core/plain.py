@@ -34,7 +34,6 @@ _lock = threading.Lock()
 
 
 def cached(ticket):
-    """The saved text for a ticket, the last error, and whether a refresh is running."""
     with _lock:
         return _cache.data.get(ticket), _errors.get(ticket), ticket in _busy
 
@@ -58,7 +57,6 @@ def ask_claude(ticket, entry):
 
 
 def refresh(ticket, force=False):
-    """Ask Haiku for the plain words of a ticket. Blocks, so call it from a thread. Returns True when it ran."""
     with _lock:
         if ticket in _busy:
             return False
@@ -84,7 +82,6 @@ def refresh(ticket, force=False):
 
 
 def where_it_stands(session):
-    """The first two sentences of the latest recap of the session, with no model call."""
     recap = (session or {}).get("summary") or ""
     sentences = re.split(r"(?<=[.!?])\s+", recap.strip())
     return " ".join(sentences[:2]).strip()

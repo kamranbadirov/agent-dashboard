@@ -28,7 +28,6 @@ def proxy_running():
 
 
 def shared_backend_up():
-    """The same probe as root's run.sh: any 2xx, 3xx or 4xx answer on port 80 means the backend serves."""
     try:
         conn = http.client.HTTPConnection("localhost", SHARED_BACKEND_PORT, timeout=2)
         conn.request("GET", "/")
@@ -40,7 +39,6 @@ def shared_backend_up():
 
 
 def check(label, ok, fix, run=None, warn=False):
-    """One check. run is the argv the board can run to fix it, in the root folder. A warn check does not block."""
     return {"label": label, "ok": ok, "fix": fix, "run": run, "warn": warn}
 
 

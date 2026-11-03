@@ -83,7 +83,6 @@ def result_text(block):
 
 
 def created_prs(path):
-    """The PRs this session opened itself: the URL in the result of its gh pr create call."""
     creating, out = set(), set()
     with open(path, "rb") as f:
         for line in f:

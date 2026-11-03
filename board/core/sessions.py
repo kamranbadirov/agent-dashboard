@@ -73,7 +73,6 @@ def close_session(session_id):
 
 
 def done_and_live(sessions):
-    """Live sessions whose PRs are all merged or closed, and that are not busy."""
     return [s for s in sessions if s["alive"] and not s.get("busy") and s["status"] == "done"]
 
 

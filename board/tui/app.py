@@ -109,7 +109,6 @@ class Board(App):
             self.call_from_thread(setattr, self, "alert_id", sent[-1]["sessionId"])
 
     def on_app_focus(self, event):
-        """After a click on a desktop alert brings the board to the front, select the agent that needs you."""
         alert_id, self.alert_id = self.alert_id, None
         if alert_id and self.focus_session(alert_id):
             record = self.tmux_record(self.target())
@@ -233,7 +232,6 @@ class Board(App):
         self.focus_agent()
 
     def picked(self, session):
-        """The session the panel acts on: for a ticket, the one picked with 1 to 9, else its lead."""
         if not session or not session.get("group"):
             return session
         index = self.picks.get(session["sessionId"])
@@ -243,7 +241,6 @@ class Board(App):
         return self.picked(self.selected())
 
     def focus_session(self, session_id):
-        """Focus the tile of a session, also when it is one of a ticket's sessions."""
         for card in self.cards():
             members = [s["sessionId"] for s in card.session.get("group") or []]
             if card.session["sessionId"] == session_id or session_id in members:
@@ -264,7 +261,6 @@ class Board(App):
         self.action_resume()
 
     def actions_for(self, session):
-        """The actions the panel offers for a tile, as (key, label, action name)."""
         target = self.picked(session)
         out = []
         if target and (self.tmux_record(target) or target.get("resumeCmd")):
@@ -297,7 +293,6 @@ class Board(App):
             w.scroll_visible()
 
     def tmux_record(self, session):
-        """What the terminal panel needs for a session that lives in board tmux: a board agent or a program."""
         if not session:
             return None
         if session.get("proc"):

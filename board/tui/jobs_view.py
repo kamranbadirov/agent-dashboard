@@ -25,7 +25,6 @@ def job_session(job):
 
 
 def proc_session(proc):
-    """A program such as make run in a board tmux session, shaped like an agent so the board can show it as a tile."""
     failed = proc["dead"] and proc["exitCode"] not in (0, None)
     status = ("your_move" if failed else "done") if proc["dead"] else "working"
     return {

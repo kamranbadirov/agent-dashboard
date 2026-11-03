@@ -36,7 +36,7 @@ class Flow:
     tag: str
     questions: list
     typed_confirm: Optional[Callable] = None  # function of the answers; the word to type before going ahead, or None
-    confirm_note: Optional[Callable] = None  # function of the answers; the warning above the typed word
+    confirm_note: Optional[Callable] = None
     infer: Optional[Callable] = None
 
 

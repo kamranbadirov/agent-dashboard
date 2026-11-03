@@ -21,8 +21,6 @@ def title_of(key):
 
 
 def start(kind, name, argv, cwd, env=None):
-    """Run a program such as make run in a board tmux session, so its prompts and output stay in the board.
-    A live one is reused, and a finished one is replaced."""
     key = key_for(kind, name)
     found = next((p for p in listed() if p["key"] == key), None)
     if found and not found["dead"]:

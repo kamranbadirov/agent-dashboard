@@ -55,8 +55,6 @@ def notify_new_commits(state):
 
 
 def notify_needs_you(state):
-    """Alert once for each wait. A click on the alert of a board agent brings the board to the front.
-    Returns the sessions it alerted for, newest last."""
     if not NOTIFY_NEEDS_YOU:
         return []
     due = {}

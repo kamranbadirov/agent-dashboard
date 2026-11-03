@@ -56,7 +56,6 @@ def job_meta(flow, answers, command):
 
 
 def launch_in_tmux(flow, answers):
-    """Run a flow whose script may ask for a password or a yes, such as make backend, in a board tmux session."""
     command = build(flow, answers)[0]
     return procs.start(flow, answers.get("action", flow), command.steps[0], command.cwd, command.env)
 
