@@ -32,7 +32,7 @@ board/
     root.py          find the root checkout, list its platforms
     jobs.py          run root's scripts in a thread, keep their steps and output
     ptyhost.py       the tmux host: start, capture, resize and attach board agents
-    rexpane.py       inside Rex: show a board agent in a Rex pane beside the board
+    rexpane.py       inside Rex: the agent pane right of the board, and the terminal pane below it
     procs.py         programs in board tmux that are not agents: dev servers, the backend, check fixes
     tmux.conf        the board's own tmux config; the user's ~/.tmux.conf never applies
     agents.py        start and resume agents in board tmux; also open one in a Rex tab or a terminal app
@@ -56,7 +56,8 @@ board/
 - Every agent the board starts runs in board tmux, also with "In a new Rex tab" or "In another terminal". That choice only opens one more view, which runs `tmux attach`.
 - An agent waits for you when its `~/.claude/sessions/<pid>.json` says `"status": "waiting"`. The transcript is not enough, because Claude Code writes a pending AskUserQuestion to it late. A click on the alert of a board agent brings the board's terminal app to the front (`BOARD_APP_ID`), and the board selects that agent.
 - A tmux session outlives the board. After a board restart, an agent with a live tmux session is still alive. The board does not start it again.
-- Inside Rex (`REX_SESSION` and `REX_BLOCK` set, `rex` on the PATH), the board shows agents in a Rex pane to its right. Enter or a click on a board agent opens the pane with `rex split`, and the pane runs `tmux attach`. Moving to another board agent runs `tmux switch-client` on that pane. It does not open a new pane. `ctrl+]` in the pane detaches and closes it. `q` closes the pane as the board quits; the agents keep running in tmux. The right panel then shows only the preview.
+- Inside Rex (`REX_SESSION` and `REX_BLOCK` set, `rex` on the PATH), the board shows agents in a Rex pane to its right. Enter or a click on a board agent opens the pane with `rex split`, and the pane runs `tmux attach`. Moving to another board agent runs `tmux switch-client` on that pane. It does not open a new pane. `ctrl+]` in the pane detaches and closes it. `q` closes the board's panes as it quits; the programs keep running in tmux. The right panel then shows only the preview.
+- `T` opens a terminal: a login shell in board tmux (`proc-term-<parent>-<folder>`), in the selected session's folder, else the root checkout. One shell for each folder; `T` again reuses it. Inside Rex it opens in a pane below the agent pane, or below the board when no agent pane is open. Outside Rex it takes the whole tab until you detach with `ctrl+]`. Terminals do not show as tiles.
 - Outside Rex, the right panel shows the agent. It reads `tmux capture-pane` every 250 ms in a thread, and only while the panel shows. Enter or a printable key on the panel suspends the board and runs `tmux attach`. `ctrl+]` detaches and goes back to the board.
 - Enter on an ended board agent starts `claude --resume` in tmux, then shows it.
 - Enter on a live session that runs outside the board offers to move it in. After a confirm, the board stops it (SIGTERM), waits until the old process exits, then resumes it in board tmux. A busy session is not moved.
@@ -68,9 +69,9 @@ board/
 
 ## Design
 
-The tile follows "option C": a colored rail on the left, then title and time, the status, and a bottom row with the ticket chip, round repo logos and the ✎ ✕ buttons. Do not show PR numbers. Each logo opens its PR.
+The tile follows "option C": a colored rail on the left, then title and time, the status, and a bottom row with the ticket chip and round repo logos. The tile has no small icon buttons; rename and stop live on the panel's action row. Do not show PR numbers. Each logo opens its PR.
 
-A tile is a ticket. The sessions whose main ticket is the same share one tile (`core/group.py`). The main ticket is the first one found: the platform's branch, then the transcript, then the titles of the session's own PRs. A PR is the session's own when the session opened it (`gh pr create` in its transcript) or works on its branch. A PR the session only links does not count. The tile shows the most urgent status of its sessions and "N sessions", and it has no ✎ ✕. A session with no ticket keeps a tile of its own.
+A tile is a ticket. The sessions whose main ticket is the same share one tile (`core/group.py`). The main ticket is the first one found: the platform's branch, then the transcript, then the titles of the session's own PRs. A PR is the session's own when the session opened it (`gh pr create` in its transcript) or works on its branch. A PR the session only links does not count. The tile shows the most urgent status of its sessions and "N sessions". A session with no ticket keeps a tile of its own.
 
 The side panel starts with the title, then one quiet row of actions with their keys (`⏎ Open  p PR  t Ticket  R Rename  x Stop`). There is no red button. "Stop" reads "Dismiss" for an ended session. For a ticket, the panel lists its sessions as numbered rows. `1` to `9` or a click picks and opens one, and the actions apply to the picked session. Enter opens the lead session: the most urgent live one, else the newest.
 

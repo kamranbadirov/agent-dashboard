@@ -7,10 +7,10 @@ import time
 
 from . import ptyhost
 
-LABEL = "agent"
-RATIO = "62"
+AGENT, TERM = "agent", "term"
+LAYOUT = {AGENT: ("right", "62"), TERM: ("below", "40")}
 CLIENT_WAIT_SECONDS = 3
-_pane = {"block": None, "tty": None}
+_panes = {AGENT: {"block": None, "tty": None}, TERM: {"block": None, "tty": None}}
 _lock = threading.Lock()
 
 
@@ -35,18 +35,27 @@ def blocks():
         return set()
 
 
-def pane_open():
-    return bool(_pane["block"]) and _pane["tty"] in ptyhost.clients() and _pane["block"] in blocks()
+def pane_open(name=AGENT):
+    pane = _panes[name]
+    return bool(pane["block"]) and pane["tty"] in ptyhost.clients() and pane["block"] in blocks()
 
 
-def focus_pane():
-    rex("focus", "-s", os.environ["REX_SESSION"], _pane["block"])
+def focus_pane(name=AGENT):
+    rex("focus", "-s", os.environ["REX_SESSION"], _panes[name]["block"])
 
 
-def open_pane(key, focus):
+def anchor_for(name):
+    """The agent pane sits right of the board. The terminal sits below the agent pane, or below the board."""
+    if name == TERM and pane_open(AGENT):
+        return _panes[AGENT]["block"]
+    return os.environ["REX_BLOCK"]
+
+
+def open_pane(key, focus, name=AGENT):
+    split, ratio = LAYOUT[name]
     before = ptyhost.clients()
-    result = rex("split", "-s", os.environ["REX_SESSION"], "-b", os.environ["REX_BLOCK"], "--split=right",
-                 "--ratio", RATIO, "--label", LABEL, f"--focus={'true' if focus else 'false'}", "--json",
+    result = rex("split", "-s", os.environ["REX_SESSION"], "-b", anchor_for(name), f"--split={split}",
+                 "--ratio", ratio, "--label", name, f"--focus={'true' if focus else 'false'}", "--json",
                  "--", *ptyhost.attach_argv(key))
     if result.returncode != 0:
         return False, result.stderr.strip() or "Rex could not open a pane."
@@ -58,20 +67,22 @@ def open_pane(key, focus):
     while time.time() < deadline:
         new = ptyhost.clients() - before
         if new:
-            _pane.update(block=block, tty=new.pop())
+            _panes[name].update(block=block, tty=new.pop())
             return True, ""
         time.sleep(0.1)
-    _pane.update(block=block, tty=None)
+    _panes[name].update(block=block, tty=None)
     return False, "The pane opened, but tmux did not attach in it."
 
 
 def close_pane():
-    """Close the board's Rex pane. Only its tmux attach ends; the agent keeps running in tmux."""
+    """Close the board's Rex panes. Only their tmux attach ends; the programs keep running in tmux."""
     with _lock:
-        block = _pane["block"]
-        _pane.update(block=None, tty=None)
-        if block and block in blocks():
-            rex("block", "close", "-s", os.environ["REX_SESSION"], block)
+        found = blocks()
+        for pane in _panes.values():
+            block = pane["block"]
+            pane.update(block=None, tty=None)
+            if block and block in found:
+                rex("block", "close", "-s", os.environ["REX_SESSION"], block)
 
 
 def open_tab(key, title):
@@ -79,17 +90,17 @@ def open_tab(key, title):
     return result.returncode == 0, result.stderr.strip() or "Rex could not open a tab."
 
 
-def show(key, focus=False, open_new=True):
-    """Show the tmux session `key` in the Rex pane beside the board. With open_new False,
+def show(key, focus=False, open_new=True, name=AGENT):
+    """Show the tmux session `key` in one of the board's Rex panes. With open_new False,
     only switch a pane that is already open."""
     with _lock:
         ptyhost.release_size(key)
-        if pane_open():
-            if not ptyhost.switch_client(_pane["tty"], key):
-                return False, "tmux could not switch the pane to this agent."
+        if pane_open(name):
+            if not ptyhost.switch_client(_panes[name]["tty"], key):
+                return False, "tmux could not switch the pane."
             if focus:
-                focus_pane()
+                focus_pane(name)
             return True, ""
         if not open_new:
             return True, ""
-        return open_pane(key, focus)
+        return open_pane(key, focus, name)
