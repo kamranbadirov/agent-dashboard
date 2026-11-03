@@ -28,6 +28,8 @@ from .widgets.topbar import WIZARD_HIT, TopBar
 from .wizard.screen import WizardScreen
 
 REFRESH_SECONDS = 20
+NARROW_COLUMNS = 120
+TILE_MIN, TILE_MAX = 38, 48
 NEW_WORK_LABEL = " + New work  w "
 
 
@@ -79,7 +81,12 @@ class Board(App):
                 yield AgentTerminal(id="terminal")
         yield Footer()
 
+    def on_resize(self, event):
+        """A narrow board, such as beside the agent pane in Rex, puts the details under the tiles, not beside them."""
+        self.query_one("#main").set_class(event.size.width < NARROW_COLUMNS, "narrow")
+
     def on_mount(self):
+        self.query_one("#main").set_class(self.size.width < NARROW_COLUMNS, "narrow")
         self.query_one("#top", TopBar).update(Text("Agents  loading…", style=f"bold {INK}"))
         self.query_one("#terminal").display = False
         self.load()
@@ -205,7 +212,7 @@ class Board(App):
             header.append(name, style=f"bold {color}")
             header.append(f"  {len(items)}", style=MUTED)
             widgets.append(SectionHeader(header))
-            widgets.append(ItemGrid(*[AgentTile(s) for s in items], min_column_width=38))
+            widgets.append(ItemGrid(*[AgentTile(s) for s in items], min_column_width=TILE_MIN, max_column_width=TILE_MAX))
         if not widgets:
             widgets.append(Static("No agents right now. Start one, and it shows up here.", id="empty"))
         lst.mount_all(widgets)

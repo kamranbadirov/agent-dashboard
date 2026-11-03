@@ -6,6 +6,9 @@ Screen {{ background: #0d1117; }}
 #main {{ height: 1fr; }}
 #list {{ width: 1fr; padding: 0 1 0 2; scrollbar-size-vertical: 1; }}
 #side {{ width: 1fr; min-width: 40; background: #161b22; border-left: tall #21262d; }}
+#main.narrow {{ layout: vertical; }}
+#main.narrow #list {{ width: 1fr; height: 2fr; }}
+#main.narrow #side {{ width: 1fr; min-width: 0; height: 3fr; border-left: none; border-top: tall #21262d; }}
 #preview {{ padding: 1 2; }}
 #terminal-header {{ height: 2; padding: 0 2; margin: 1 0 0 0; }}
 #terminal-view {{ height: 1fr; margin: 1 1 0 2; }}
