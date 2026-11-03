@@ -6,7 +6,8 @@ from .root import platform_branch, root_dir
 from .transcript import tickets_in
 
 PREFIX = "proc-"
-TITLES = {"run": "Dev servers", "backend": "Shared backend", "fix": "Fix"}
+TITLES = {"run": "Dev servers", "backend": "Shared backend", "fix": "Fix", "term": "Terminal"}
+TERM = "term"
 UNSAFE_RE = re.compile(r"[^A-Za-z0-9_-]")
 
 
@@ -36,6 +37,17 @@ def start(kind, name, argv, cwd, env=None):
 
 def start_dev_servers(platform):
     return start("run", os.path.basename(platform), ["make", "run"], platform)
+
+
+def start_terminal(cwd):
+    """A login shell in board tmux, in cwd. One for each folder; a live one is reused."""
+    path = os.path.abspath(cwd)
+    name = f"{os.path.basename(os.path.dirname(path))}-{os.path.basename(path)}"
+    return start(TERM, name, [os.environ.get("SHELL") or "/bin/zsh", "-l"], path)
+
+
+def is_terminal(key):
+    return key.startswith(key_for(TERM, ""))
 
 
 def tickets_of(key):

@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 from datetime import datetime
 
@@ -12,6 +13,7 @@ from textual.widgets import Footer, Static
 from ..core import agents, jobs, plain, procs, ptyhost, rexpane
 from ..core.group import group
 from ..core.notify import notify_needs_you, notify_new_commits
+from ..core.root import RootMissing, root_dir
 from ..core.sessions import close_all, close_session, done_and_live
 from ..core.state import build_state
 from ..core.store import dismiss_session, rename_session
@@ -47,6 +49,7 @@ class Board(App):
         Binding("p", "open_pr", "PR"),
         Binding("t", "open_ticket", "Ticket"),
         Binding("R", "rename_agent", "Rename"),
+        Binding("T", "terminal", "Terminal"),
         Binding("x", "close_agent", "Close"),
         Binding("X", "close_done", "Close all done", show=False),
         Binding("e", "toggle_inactive", "Inactive"),
@@ -130,7 +133,7 @@ class Board(App):
 
     def listed(self):
         started = [self.with_record(s) for s in (self.state or {}).get("sessions", [])]
-        sessions = [job_session(j) for j in jobs.listed()] + [proc_session(p) for p in self.procs] + started
+        sessions = [job_session(j) for j in jobs.listed()] + [proc_session(p) for p in self.procs if not procs.is_terminal(p["key"])] + started
         return [s for s in group(sessions) if s["status"] not in ("ended", "done") or self.show_inactive]
 
     def visible(self):
@@ -335,7 +338,7 @@ class Board(App):
             self.query_one(Preview).show(tile, session, self.actions_for(tile) if tile else [])
 
     @work(thread=True, exclusive=True, group="rexpane")
-    def show_in_pane(self, key, focus, open_new):
+    def show_in_pane(self, key, focus, open_new, name=rexpane.AGENT):
         if not ptyhost.alive(key):
             if not open_new:
                 return
@@ -343,9 +346,41 @@ class Board(App):
             if not ok:
                 self.call_from_thread(self.notify, message, severity="error")
                 return
-        ok, message = rexpane.show(key, focus=focus, open_new=open_new)
+        ok, message = rexpane.show(key, focus=focus, open_new=open_new, name=name)
         if not ok:
             self.call_from_thread(self.notify, message, severity="error")
+
+    def terminal_dir(self):
+        """The folder for T: the selected session's folder, else the root checkout."""
+        target = self.target()
+        record = self.tmux_record(target) if target else None
+        cwd = (target or {}).get("cwd") or (record or {}).get("cwd")
+        if not cwd and target and target.get("job"):
+            cwd = target["job"].meta.get("platform")
+        if cwd and os.path.isdir(cwd):
+            return cwd
+        try:
+            return str(root_dir())
+        except RootMissing:
+            return os.path.expanduser("~")
+
+    def action_terminal(self):
+        self.terminal_worker(self.terminal_dir())
+
+    @work(thread=True, group="terminal")
+    def terminal_worker(self, cwd):
+        ok, message, key = procs.start_terminal(cwd)
+        if not ok:
+            self.call_from_thread(self.notify, message, severity="error")
+            return
+        if self.in_rex:
+            self.show_in_pane(key, focus=True, open_new=True, name=rexpane.TERM)
+        else:
+            self.call_from_thread(self.attach_full, key)
+
+    def attach_full(self, key):
+        with self.suspend():
+            ptyhost.attach(key)
 
     def open_agent(self, session_id):
         if self.in_rex:
