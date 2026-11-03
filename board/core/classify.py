@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
+from datetime import datetime
 
-from .config import STALE_HOURS
 from .github import my_login
 
 
@@ -55,8 +54,6 @@ def asked_after_close(info, prs):
 
 def classify(sess_status, alive, info, prs):
     reasons = action_reasons(info, prs, sess_status)
-    last = info.get("lastActivity")
-    stale = not last or (datetime.now(timezone.utc) - parse_time(last)).total_seconds() > STALE_HOURS * 3600
     if prs and all(p["state"] in ("MERGED", "CLOSED") for p in prs) and not asked_after_close(info, prs):
         return "done", reasons
     if alive and sess_status == "busy":
@@ -64,11 +61,11 @@ def classify(sess_status, alive, info, prs):
     if reasons:
         return "your_move", reasons
     if is_review_agent(info, prs):
-        if not alive or stale:
+        if not alive:
             return "ended", reasons
         return "reviewing", ["review agent idle"]
     if any(p["state"] == "OPEN" for p in prs):
         return "in_review", ["waiting on reviewers"]
-    if not alive or stale:
+    if not alive:
         return "ended", reasons
     return "your_move", ["agent finished"]

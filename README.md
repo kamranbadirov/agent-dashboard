@@ -25,7 +25,7 @@ Each agent goes into one group:
 | **Reviewing PRs** | The agent reviews a PR that somebody else wrote. |
 | **Waiting on reviewers** | The PR is open and has no action for you. |
 | **Done** | All PRs of the session are merged or closed. |
-| **Inactive** | The session ended or had no activity for 24 hours. |
+| **Inactive** | The session ended. A running agent stays on the board until you stop it. |
 
 The dashboard is a terminal board (TUI, a text interface that runs in the terminal).
 
@@ -118,7 +118,6 @@ Set these environment variables to change the defaults:
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `ENDED_LOOKBACK_HOURS` | `72` | How far back to look for ended sessions. |
-| `STALE_HOURS` | `24` | Hours without activity before an agent becomes inactive. |
 | `NOTIFY_NEEDS_YOU` | `1` | Set to `0` to stop the desktop notification when an agent asks a question or waits for a tool approval. |
 | `INFER_MODEL` | `haiku` | The Claude model that reads a ticket when you press `s`. |
 | `CHAT_DIR` | `~/claude-chats` | The folder where `n` starts a new chat. It must not be a git repo. |
@@ -127,7 +126,7 @@ Set these environment variables to change the defaults:
 Example:
 
 ```bash
-STALE_HOURS=12 python3 server.py
+ENDED_LOOKBACK_HOURS=24 python3 server.py
 ```
 
 ## Project layout

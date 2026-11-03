@@ -133,7 +133,7 @@ class Board(App):
     def listed(self):
         started = [self.with_record(s) for s in (self.state or {}).get("sessions", [])]
         sessions = [job_session(j) for j in jobs.listed()] + [proc_session(p) for p in self.procs if not procs.is_terminal(p["key"])] + started
-        return [s for s in group(sessions) if s["status"] not in ("ended", "done") or self.show_inactive]
+        return [s for s in group(sessions) if s.get("alive") or s["status"] not in ("ended", "done") or self.show_inactive]
 
     def visible(self):
         return [s for s in self.listed() if self.status_filter in (None, s["status"])]
