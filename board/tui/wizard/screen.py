@@ -111,8 +111,11 @@ class WizardScreen(ModalScreen):
         foot.remove_children()
         foot.mount(*[button(spec) for spec in left], Static(classes="spacer"), *[button(spec) for spec in right])
 
-    def set_enabled(self, button_id, enabled):
-        for found in self.query(f"#{button_id}"):
+    def footer_buttons(self, action):
+        return [b for b in self.query("#wizard-foot Btn") if b.action == action]
+
+    def set_enabled(self, action, enabled):
+        for found in self.footer_buttons(action):
             found.disabled = not enabled
 
     def questions(self):
@@ -258,13 +261,18 @@ class WizardScreen(ModalScreen):
         note = self.flow.confirm_note(self.answers) if word and self.flow.confirm_note else None
         summary = SummaryView(self.recap_rows(), build(self.flow.key, self.answers)[0], word, note)
         self.body(summary)
-        self.summary_foot(False)
+        self.summary_foot()
         self.run_checks()
 
-    def summary_foot(self, can_fix):
+    def summary_foot(self):
         kind = "danger" if self.flow.key == "clean" else "primary"
-        fix = [("Run fix  f", "fix", "plain")] if can_fix else []
-        self.foot([("Back", "back", "ghost")], fix + [(VERBS[self.flow.key], "create", kind, {"id": "create", "disabled": True})])
+        self.foot([("Back", "back", "ghost")], [("Run fix  f", "fix", "plain"),
+                                                 (VERBS[self.flow.key], "create", kind, {"disabled": True})])
+        self.show_fix_button(False)
+
+    def show_fix_button(self, shown):
+        for found in self.footer_buttons("fix"):
+            found.display = shown
 
     @work(thread=True, exclusive=True)
     def run_checks(self):
@@ -277,9 +285,7 @@ class WizardScreen(ModalScreen):
         self.results = results
         self.checks_ok = preflight.passed(results)
         self.query_one(SummaryView).show_checks(results, RECHECK_SECONDS)
-        can_fix = bool(preflight.fixable(results))
-        if can_fix != bool(self.query("#wizard-foot Btn").filter(".plain")):
-            self.summary_foot(can_fix)
+        self.show_fix_button(bool(preflight.fixable(results)))
         self.update_create()
         if not all(r["ok"] for r in results):
             self.set_timer(RECHECK_SECONDS, self.recheck_failed)
@@ -345,7 +351,7 @@ class WizardScreen(ModalScreen):
         self.head(f"{RUNNING[self.flow.key]}…", self.job.label,
                   *self.step_of(self.asked_count() + 2))
         self.body(ProgressView())
-        self.foot([("Hide", "hide", "ghost")], [("Continue", "continue", "primary", {"id": "continue", "disabled": True})])
+        self.foot([("Hide", "hide", "ghost")], [("Continue", "continue", "primary", {"disabled": True})])
         self.failed_footer = False
         self.call_after_refresh(self.show_progress)
 
