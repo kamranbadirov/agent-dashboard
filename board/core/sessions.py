@@ -52,21 +52,33 @@ def recent_ended(live_ids):
     return out
 
 
+def session_pids(session_id):
+    pids = set()
+    for f in SESSIONS_DIR.glob("*.json"):
+        try:
+            d = json.loads(f.read_text())
+        except Exception:
+            continue
+        if d.get("sessionId") == session_id and pid_alive(d.get("pid", -1)):
+            pids.add(d["pid"])
+    return pids
+
+
 def close_session(session_id):
     if not isinstance(session_id, str) or not session_id.strip():
         return False, "Missing session."
-    meta = live_sessions().get(session_id)
-    if not meta:
+    pids = session_pids(session_id)
+    if not pids:
         return False, "That agent is not running."
-    pid = meta["pid"]
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return True, "Already closed."
-    except PermissionError:
-        return False, "Not allowed to close that process."
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        except PermissionError:
+            return False, "Not allowed to close that process."
     for _ in range(20):
-        if not pid_alive(pid):
+        if not any(pid_alive(pid) for pid in pids):
             return True, "Closed."
         time.sleep(0.1)
     return True, "Close requested; the agent is still shutting down."
