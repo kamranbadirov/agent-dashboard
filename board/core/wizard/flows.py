@@ -209,7 +209,15 @@ BROWSER = Flow("browser", "Shared browser", "The Chrome window that QA agents at
     Question("action", "choice", "What should the shared browser do?", "", browser_options),
 ])
 
-FLOWS = {f.key: f for f in (TICKET, NEW_WORK, REVIEW, CLEAN, BACKEND_FLOW, BROWSER)}
+REVIEW_ONLY = Flow("review_only", "Review only", "Start a Claude review agent for a ticket. No platform and no servers.",
+                   "claude · under 1 min", [
+    Question("ticket", "text", "Which ticket?", "The agent runs /devs:code-review on it, in the root checkout.",
+             label="Ticket ID", hint="For example DAT-613.", validate=check_ticket),
+    WHERE,
+    TERMINAL_APP,
+])
+
+FLOWS = {f.key: f for f in (TICKET, NEW_WORK, REVIEW, REVIEW_ONLY, CLEAN, BACKEND_FLOW, BROWSER)}
 
 
 SHORT = {"branch": "Branch", "backend": "Backend", "mobile": "Mobile apps", "seed": "Demo data", "agent": "Agent",

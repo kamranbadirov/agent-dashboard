@@ -9,10 +9,10 @@ from ...core import procs, ptyhost
 from ...core.jobs import Busy
 from ...core.root import RootMissing
 from ...core.wizard import preflight
-from ...core.wizard.commands import IN_TMUX_FLOWS, NEW_FLOWS, PLATFORM_FLOWS, build
+from ...core.wizard.commands import AGENT_FLOWS, IN_TMUX_FLOWS, NEW_FLOWS, PLATFORM_FLOWS, build
 from ...core.wizard.flows import FLOWS
 from ...core.wizard.model import Option, Question, options_for
-from ...core.wizard.run import launch, launch_in_tmux
+from ...core.wizard.run import launch, launch_in_tmux, start_review_agent
 from ..theme import MUTED
 from .inputs import Changed, Submitted, make_input
 from .parts import Btn, crumbs
@@ -21,9 +21,9 @@ from .views import ProgressView, ReadyView, SummaryView
 
 MENU = Question("flow", "choice", "What do you want to do?", "Pick one. You can cancel at any step.",
                 [Option(f.key, f.label, f.detail, tag=f.tag) for f in FLOWS.values()])
-VERBS = {"ticket": "Create platform", "new": "Create platform", "review": "Create platform", "clean": "Delete", "backend": "Run", "browser": "Run"}
+VERBS = {"review_only": "Start agent", "ticket": "Create platform", "new": "Create platform", "review": "Create platform", "clean": "Delete", "backend": "Run", "browser": "Run"}
 RUNNING = {"ticket": "Creating platform", "new": "Creating platform", "review": "Creating platform", "clean": "Cleaning up", "backend": "Running", "browser": "Running"}
-AFTER_QUESTIONS = {"ticket": 3, "new": 3, "review": 3, "clean": 2, "backend": 2, "browser": 2}  # summary, progress, and the ready screen for flows that have one
+AFTER_QUESTIONS = {"review_only": 1, "ticket": 3, "new": 3, "review": 3, "clean": 2, "backend": 2, "browser": 2}  # summary, progress, and the ready screen for flows that have one
 TICK_SECONDS = 0.4
 RECHECK_SECONDS = 5
 
@@ -339,6 +339,9 @@ class WizardScreen(ModalScreen):
     # running
 
     def create(self):
+        if self.flow.key in AGENT_FLOWS:
+            self.create_agent()
+            return
         if self.flow.key in IN_TMUX_FLOWS:
             self.create_in_tmux()
             return
@@ -354,6 +357,17 @@ class WizardScreen(ModalScreen):
         self.foot([("Hide", "hide", "ghost")], [("Continue", "continue", "primary", {"disabled": True})])
         self.failed_footer = False
         self.call_after_refresh(self.show_progress)
+
+    @work(thread=True, exclusive=True)
+    def create_agent(self):
+        try:
+            ok, message, record = start_review_agent(self.answers)
+        except RootMissing as e:
+            ok, message, record = False, str(e), None
+        if not ok:
+            self.app.call_from_thread(self.notify, message, severity="error")
+            return
+        self.app.call_from_thread(self.dismiss, (None, "open_session", record["sessionId"]))
 
     @work(thread=True, exclusive=True)
     def create_in_tmux(self):
