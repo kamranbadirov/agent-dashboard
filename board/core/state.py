@@ -54,10 +54,12 @@ def starting_agents(known):
             continue
         started = datetime.fromisoformat(record["createdAt"])
         starting = (now - started).total_seconds() <= STARTING_GRACE_SECONDS
+        alive = running is not None and sid in running
+        status = "working" if starting else "your_move" if alive else "ended"
         out.append(
             {
-                "sessionId": sid, "name": None, "pid": None, "alive": False, "busy": starting, "status": "working" if starting else "ended",
-                "reasons": [], "title": record["title"],
+                "sessionId": sid, "name": None, "pid": None, "alive": alive, "busy": starting, "status": status,
+                "reasons": ["no prompt yet"] if alive and not starting else [], "title": record["title"],
                 "tickets": session_tickets(tickets_in(f"{record['title']} {record.get('prompt') or ''}"), [], record["cwd"]),
                 "summary": None, "lastAssistant": None,
                 "lastUserPrompt": record.get("prompt"), "pendingTool": None, "pendingQuestion": None,

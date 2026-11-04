@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timezone
 
 from .config import DISMISSED_FILE, TITLES_FILE
+from . import ptyhost
 from .sessions import close_session, live_sessions
 
 
@@ -29,6 +30,8 @@ def dismiss_session(session_id):
 
 def stop_session(session_id):
     ok, message = close_session(session_id)
+    if not ok and ptyhost.alive(session_id):
+        ok, message = ptyhost.kill(session_id), "Closed."
     if ok:
         dismiss_session(session_id)
     return ok, message
