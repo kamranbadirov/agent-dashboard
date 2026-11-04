@@ -134,7 +134,7 @@ class Board(App):
         return with_agent_record(session, record) if record else session
 
     def listed(self):
-        started = [self.with_record(s) for s in (self.state or {}).get("sessions", []) if s.get("work", True) or self.show_chats]
+        started = [self.with_record(s) for s in (self.state or {}).get("sessions", []) if (s.get("work", True) or self.show_chats) and (not s.get("dismissed") or self.show_inactive)]
         sessions = [job_session(j) for j in jobs.listed()] + [proc_session(p) for p in self.procs if not procs.is_terminal(p["key"])] + started
         return [s for s in group(sessions) if s.get("alive") or s["status"] not in ("ended", "done") or self.show_inactive]
 
