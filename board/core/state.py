@@ -200,10 +200,8 @@ def build_state():
     if AUTO_CLOSE_MERGED:
         auto_close_merged(sessions)
     dismissed = load_dismissed()
-    sessions = [
-        s for s in sessions
-        if s["alive"] or (s.get("lastActivity") or "") > dismissed.get(s["sessionId"], "")
-    ]
+    for s in sessions:
+        s["dismissed"] = not s["alive"] and (s.get("lastActivity") or "") <= dismissed.get(s["sessionId"], "")
     sessions.sort(key=lambda s: s.get("lastActivity") or "", reverse=True)
     return {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
