@@ -488,6 +488,10 @@ class Board(App):
 
     def wizard_closed(self, result):
         job, action, key = (tuple(result) + (None,))[:3] if isinstance(result, tuple) else (result, None, None)
+        if action == "open_session" and key:
+            self.load()
+            self.set_timer(1, lambda: self.focus_session(key))
+            self.open_agent(key)
         if action == "open_proc" and key:
             self.load_procs()
             self.set_timer(0.5, lambda: self.focus_session(f"proc:{key}"))

@@ -86,6 +86,8 @@ def checks_for(flow, answers):
         return [has_docker]
     if flow in ("clean", "browser"):
         return []
+    if flow == "review_only":
+        return [has_gh_login]
     slug = slugify(answers["branch"]) if flow in NEW_FLOWS else review_slug(answers)
     checks = [has_gum, has_proxy, folder_free(slug)]
     if flow == "review":

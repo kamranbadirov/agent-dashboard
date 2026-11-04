@@ -1,6 +1,6 @@
 from .. import agents, jobs, procs
 from ..config import TICKET_RE
-from ..root import live_urls, platform_urls
+from ..root import live_urls, platform_urls, root_dir
 from .commands import NEW_FLOWS, PLATFORM_FLOWS, build, expected_steps, review_prs
 
 
@@ -53,6 +53,12 @@ def job_meta(flow, answers, command):
         branch = answers["branch"] if flow in NEW_FLOWS else command.slug
         meta["urls"] = platform_urls(branch, answers["backend"] == "isolated")
     return meta
+
+
+def start_review_agent(answers):
+    ticket = answers["ticket"]
+    return agents.start_agent(str(root_dir()), f"/devs:code-review {ticket}", answers["where"],
+                              answers.get("terminal_app"), f"Review {ticket}")
 
 
 def launch_in_tmux(flow, answers):
