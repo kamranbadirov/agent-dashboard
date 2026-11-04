@@ -7,7 +7,7 @@ from .classify import action_reasons, classify, is_review_agent
 from .config import AUTO_CLOSE_MERGED, STARTING_GRACE_SECONDS
 from .github import fetch_pr, my_open_prs, reviewed_prs
 from .sessions import auto_close_merged, find_transcript, live_sessions, recent_ended
-from .root import platform_branch
+from .root import platform_branch, platform_of
 from .store import load_dismissed, load_titles
 from .transcript import parse_transcript, tickets_in
 
@@ -24,7 +24,7 @@ def session_tickets(found, prs, cwd, branch=None, created=()):
 def is_work(sid, info, prs, cwd):
     if sid in agents.registry():
         return True
-    branches = {b for b in (info.get("gitBranch"), platform_branch(cwd)) if b}
+    branches = {b for b in (info.get("gitBranch"), platform_branch(cwd)) if b} if platform_of(cwd) else set()
     if any(tickets_in(b) for b in branches):
         return True
     created = set(info.get("createdPrs") or [])
