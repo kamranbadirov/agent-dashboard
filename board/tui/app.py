@@ -423,9 +423,7 @@ class Board(App):
             self.query_one(AgentTerminal).focus_terminal()
 
     def tile_clicked(self, session):
-        record = self.tmux_record(self.picked(session))
-        if record:
-            self.open_agent(record["sessionId"])
+        self.action_resume()
 
     def selected(self):
         w = self.focused
