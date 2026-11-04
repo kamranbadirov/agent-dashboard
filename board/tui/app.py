@@ -13,7 +13,7 @@ from textual.widgets import Footer, Static
 from ..core import agents, jobs, plain, procs, ptyhost, rexpane
 from ..core.group import group
 from ..core.notify import notify_needs_you, notify_new_commits
-from ..core.root import RootMissing, root_dir
+from ..core.root import RootMissing, platform_of, root_dir
 from ..core.sessions import close_all, done_and_live
 from ..core.state import build_state
 from ..core.store import dismiss_session, rename_session, stop_session
@@ -50,6 +50,7 @@ class Board(App):
         Binding("t", "open_ticket", "Ticket"),
         Binding("R", "rename_agent", "Rename"),
         Binding("T", "terminal", "Terminal"),
+        Binding("D", "dev_servers", "Dev servers"),
         Binding("x", "close_agent", "Close"),
         Binding("X", "close_done", "Close all done", show=False),
         Binding("e", "toggle_inactive", "Inactive"),
@@ -271,6 +272,8 @@ class Board(App):
             out.append(("p", "PR", "open_pr"))
         if session["tickets"]:
             out.append(("t", "Ticket", "open_ticket"))
+        if self.platform_dir(target):
+            out.append(("D", "Servers", "dev_servers"))
         if target and not (target.get("job") or target.get("proc") or target["sessionId"].startswith("pr:")):
             out.append(("R", "Rename", "rename_agent"))
         if target:
@@ -368,6 +371,32 @@ class Board(App):
             return str(root_dir())
         except RootMissing:
             return os.path.expanduser("~")
+
+    def platform_dir(self, target):
+        record = self.tmux_record(target) if target else None
+        if target and target.get("job"):
+            return target["job"].meta.get("platform")
+        found = platform_of((target or {}).get("cwd") or (record or {}).get("cwd"))
+        return str(found) if found else None
+
+    def action_dev_servers(self):
+        platform = self.platform_dir(self.target())
+        if not platform:
+            self.notify("This tile has no platform, so there are no dev servers to start.")
+            return
+        self.dev_servers_worker(platform)
+
+    @work(thread=True, group="terminal")
+    def dev_servers_worker(self, platform):
+        ok, message, key = procs.start_dev_servers(platform)
+        if not ok:
+            self.call_from_thread(self.notify, message, severity="error")
+            return
+        self.call_from_thread(self.load_procs)
+        if self.in_rex:
+            self.show_in_pane(key, focus=True, open_new=True, name=rexpane.TERM)
+        else:
+            self.call_from_thread(self.notify, f"Dev servers: {message} Select their tile to see them.")
 
     def action_terminal(self):
         self.terminal_worker(self.terminal_dir())
