@@ -86,6 +86,5 @@ class AgentTile(Widget, can_focus=True):
                 if start <= offset.x < end:
                     self.app.open_url(url)
                     return
-            self.app.tile_clicked(self.session)
-        else:
+        if event.chain >= 2:
             self.app.tile_clicked(self.session)
