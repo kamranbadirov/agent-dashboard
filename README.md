@@ -68,6 +68,7 @@ python3 server.py
 | `R` | Rename the selected agent |
 | `w` | Open the work wizard: new work, PR review, clean up, the shared backend and the shared browser. |
 | `e` | Show or hide inactive and done agents |
+| `a` | Show or hide chats with no ticket or PR. `e` still decides about ended and done ones. |
 | `r` | Refresh now |
 | `q` | Quit |
 
