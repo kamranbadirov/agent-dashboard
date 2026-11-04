@@ -21,6 +21,21 @@ def session_tickets(found, prs, cwd, branch=None, created=()):
     return list(dict.fromkeys(out))[:4]
 
 
+def is_work(sid, info, prs, cwd):
+    if sid in agents.registry():
+        return True
+    branches = {b for b in (info.get("gitBranch"), platform_branch(cwd)) if b}
+    if any(tickets_in(b) for b in branches):
+        return True
+    created = set(info.get("createdPrs") or [])
+    if any(p["key"] in created or p.get("branch") in branches for p in prs):
+        return True
+    if prs and "review" in (info.get("title") or "").lower() and is_review_agent(info, prs):
+        return True
+    first = (info.get("firstPrompt") or "").strip()
+    return first.startswith("/") and bool(tickets_in(first))
+
+
 def reviewed_ticket(prs):
     firsts = [tickets_in(p.get("title") or "")[:1] for p in prs]
     found = {t for f in firsts for t in f}
@@ -47,7 +62,7 @@ def starting_agents(known):
                 "summary": None, "lastAssistant": None,
                 "lastUserPrompt": record.get("prompt"), "pendingTool": None, "pendingQuestion": None,
                 "lastActivity": record["createdAt"], "cwd": record["cwd"], "gitBranch": record.get("branch"),
-                "remoteUrl": None, "resumeCmd": f"claude --resume {sid}", "prs": [],
+                "remoteUrl": None, "resumeCmd": f"claude --resume {sid}", "prs": [], "work": True,
             }
         )
     return out
@@ -142,6 +157,7 @@ def build_state():
                 "remoteUrl": f"https://claude.ai/code/{meta['bridgeSessionId']}" if meta and meta.get("bridgeSessionId") else None,
                 "resumeCmd": f"claude --resume {sid}",
                 "prs": prs,
+                "work": is_work(sid, info, prs, info.get("cwd") or (meta or {}).get("cwd")),
             }
         )
     sessions += starting_agents({s["sessionId"] for s in sessions})
@@ -173,6 +189,7 @@ def build_state():
                 "remoteUrl": None,
                 "resumeCmd": None,
                 "prs": [p],
+                "work": True,
             }
         )
     for s in sessions:

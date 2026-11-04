@@ -53,6 +53,7 @@ class Board(App):
         Binding("x", "close_agent", "Close"),
         Binding("X", "close_done", "Close all done", show=False),
         Binding("e", "toggle_inactive", "Inactive"),
+        Binding("a", "toggle_chats", "Chats"),
         Binding("r", "refresh", "Refresh"),
         Binding("u", "plain_refresh", "Plain words", show=False),
         Binding("escape", "clear_filter", "Clear filter", show=False),
@@ -65,6 +66,7 @@ class Board(App):
         self.state = None
         self.signature = None
         self.show_inactive = False
+        self.show_chats = False
         self.status_filter = None
         self.focused_id = None
         self.in_rex = rexpane.available()
@@ -131,7 +133,7 @@ class Board(App):
         return with_agent_record(session, record) if record else session
 
     def listed(self):
-        started = [self.with_record(s) for s in (self.state or {}).get("sessions", [])]
+        started = [self.with_record(s) for s in (self.state or {}).get("sessions", []) if s.get("work", True) or self.show_chats]
         sessions = [job_session(j) for j in jobs.listed()] + [proc_session(p) for p in self.procs if not procs.is_terminal(p["key"])] + started
         return [s for s in group(sessions) if s.get("alive") or s["status"] not in ("ended", "done") or self.show_inactive]
 
@@ -195,7 +197,7 @@ class Board(App):
                           for s in state["sessions"]]
                          + [(j.id, j.state, j.current_step) for j in jobs.listed()]
                          + [(p["key"], p["dead"], p["exitCode"]) for p in self.procs]
-                         + [self.show_inactive, self.status_filter])
+                         + [self.show_inactive, self.show_chats, self.status_filter])
         self.state = state
         self.render_top()
         if sig == self.signature and not force:
@@ -422,6 +424,12 @@ class Board(App):
 
     def action_toggle_inactive(self):
         self.show_inactive = not self.show_inactive
+        if self.state:
+            self.apply_state(self.state, force=True)
+
+    def action_toggle_chats(self):
+        self.show_chats = not self.show_chats
+        self.notify("Showing chats with no ticket or PR." if self.show_chats else "Hiding chats with no ticket or PR.")
         if self.state:
             self.apply_state(self.state, force=True)
 
