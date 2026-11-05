@@ -6,7 +6,8 @@ GRAY = "#8b949e"
 ALERT = "#e71d36"
 SEEN_RED = "#e63946"
 RUNNING = "#339989"
-WAITING = "#1985a1"
+WAITING = "#a99bd6"
+REVIEWING = "#3772ff"
 INK = "#e6edf3"
 MUTED = "#8b949e"
 
@@ -14,7 +15,7 @@ SECTIONS = [
     ("your_move", "Needs you", ALERT),
     ("setting_up", "Setting up", BLUE),
     ("working", "Running", RUNNING),
-    ("reviewing", "Reviewing PRs", BLUE),
+    ("reviewing", "Reviewing PRs", REVIEWING),
     ("in_review", "Waiting on reviewers", WAITING),
     ("done", "Done", GRAY),
     ("ended", "Inactive", GRAY),

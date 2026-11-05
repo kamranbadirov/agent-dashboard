@@ -1,4 +1,4 @@
-from .theme import ALERT, AQUA, BLUE, GRAY, INK, MUTED, RUNNING, SEEN_RED, WAITING
+from .theme import ALERT, AQUA, BLUE, GRAY, INK, MUTED, REVIEWING, RUNNING, SEEN_RED, WAITING
 
 APP_CSS = f"""
 Screen {{ background: #0d1117; }}
@@ -33,8 +33,8 @@ ItemGrid {{ grid-gutter: 1 2; height: auto; margin: 0 0 0 0; }}
 .tile.working:focus {{ background: {RUNNING} 22%; border: tall {RUNNING}; }}
 .tile.setting_up {{ background: {BLUE} 10%; border: tall {BLUE} 35%; }}
 .tile.setting_up:focus {{ background: {BLUE} 22%; border: tall {BLUE}; }}
-.tile.reviewing {{ background: {BLUE} 10%; border: tall {BLUE} 35%; }}
-.tile.reviewing:focus {{ background: {BLUE} 22%; border: tall {BLUE}; }}
+.tile.reviewing {{ background: {REVIEWING} 10%; border: tall {REVIEWING} 35%; }}
+.tile.reviewing:focus {{ background: {REVIEWING} 22%; border: tall {REVIEWING}; }}
 .tile.in_review {{ background: {WAITING} 10%; border: tall {WAITING} 35%; }}
 .tile.in_review:focus {{ background: {WAITING} 22%; border: tall {WAITING}; }}
 .tile.done {{ background: {GRAY} 10%; border: tall {GRAY} 35%; }}
