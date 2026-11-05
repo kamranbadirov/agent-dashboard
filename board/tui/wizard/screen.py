@@ -61,6 +61,10 @@ class WizardScreen(ModalScreen):
         self.tick = 0
         self.failed_footer = False
 
+    def dismiss(self, result=None):
+        if self.is_current:
+            return super().dismiss(result)
+
     def compose(self):
         with Vertical(id="wizard"):
             with Vertical(id="wizard-head"):
