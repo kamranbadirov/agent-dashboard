@@ -71,7 +71,7 @@ board/
 
 The tile follows "option C": a colored rail on the left, then title and time, the status, and a bottom row with the ticket chip and round repo logos. The tile has no small icon buttons; rename and stop live on the panel's action row. Do not show PR numbers. Each logo opens its PR.
 
-A tile in "Needs you" flashes red until you click it or open it. When the agent asks again later, it flashes again. The board keeps this in memory, so a restart flashes the tiles again.
+A tile in "Needs you" flashes red until you click it or open it, then it turns a darker red. When the agent asks again later, it flashes again. The board keeps this in memory, so a restart flashes the tiles again.
 
 Tiles are 38 to 48 columns wide, so one tile alone in a section does not stretch across the row. When the board is narrower than 120 columns, as it is beside the agent pane in Rex, the side panel moves under the tiles and takes the board's full width.
 

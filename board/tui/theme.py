@@ -3,15 +3,17 @@ RED = "#f0525a"
 BLUE = "#5b8def"
 GREEN = "#3fb950"
 GRAY = "#8b949e"
+SEEN_RED = "#b8434c"
+LAVENDER = "#a99bd6"
 INK = "#e6edf3"
 MUTED = "#8b949e"
 
 SECTIONS = [
-    ("your_move", "Needs you", AQUA),
+    ("your_move", "Needs you", RED),
     ("setting_up", "Setting up", BLUE),
-    ("working", "Running", RED),
+    ("working", "Running", GREEN),
     ("reviewing", "Reviewing PRs", BLUE),
-    ("in_review", "Waiting on reviewers", GREEN),
+    ("in_review", "Waiting on reviewers", LAVENDER),
     ("done", "Done", GRAY),
     ("ended", "Inactive", GRAY),
 ]
