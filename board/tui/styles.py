@@ -1,4 +1,4 @@
-from .theme import AQUA, BLUE, GRAY, GREEN, INK, MUTED, RED
+from .theme import ALERT, AQUA, BLUE, GRAY, INK, MUTED, RUNNING, SEEN_RED, WAITING
 
 APP_CSS = f"""
 Screen {{ background: #0d1117; }}
@@ -24,17 +24,19 @@ Screen {{ background: #0d1117; }}
 SectionHeader {{ margin: 1 0 0 0; height: 2; padding: 0 1; }}
 ItemGrid {{ grid-gutter: 1 2; height: auto; margin: 0 0 0 0; }}
 .tile {{ text-wrap: nowrap; height: 6; min-height: 6; padding: 0 1; }}
-.tile.your_move {{ background: {AQUA} 10%; border: tall {AQUA} 35%; }}
-.tile.your_move:focus {{ background: {AQUA} 22%; border: tall {AQUA}; }}
-#list.flash .tile.alert {{ background: {RED} 30%; border: tall {RED}; }}
-.tile.working {{ background: {RED} 10%; border: tall {RED} 35%; }}
-.tile.working:focus {{ background: {RED} 22%; border: tall {RED}; }}
+.tile.your_move {{ background: {SEEN_RED} 12%; border: tall {SEEN_RED} 50%; }}
+.tile.your_move:focus {{ background: {SEEN_RED} 24%; border: tall {SEEN_RED}; }}
+.tile.alert {{ background: {ALERT} 12%; border: tall {ALERT} 50%; }}
+.tile.alert:focus {{ background: {ALERT} 24%; border: tall {ALERT}; }}
+#list.flash .tile.alert {{ background: {ALERT} 35%; border: tall {ALERT}; }}
+.tile.working {{ background: {RUNNING} 10%; border: tall {RUNNING} 35%; }}
+.tile.working:focus {{ background: {RUNNING} 22%; border: tall {RUNNING}; }}
 .tile.setting_up {{ background: {BLUE} 10%; border: tall {BLUE} 35%; }}
 .tile.setting_up:focus {{ background: {BLUE} 22%; border: tall {BLUE}; }}
 .tile.reviewing {{ background: {BLUE} 10%; border: tall {BLUE} 35%; }}
 .tile.reviewing:focus {{ background: {BLUE} 22%; border: tall {BLUE}; }}
-.tile.in_review {{ background: {GREEN} 10%; border: tall {GREEN} 35%; }}
-.tile.in_review:focus {{ background: {GREEN} 22%; border: tall {GREEN}; }}
+.tile.in_review {{ background: {WAITING} 10%; border: tall {WAITING} 35%; }}
+.tile.in_review:focus {{ background: {WAITING} 22%; border: tall {WAITING}; }}
 .tile.done {{ background: {GRAY} 10%; border: tall {GRAY} 35%; }}
 .tile.done:focus {{ background: {GRAY} 22%; border: tall {GRAY}; }}
 .tile.ended {{ background: {GRAY} 10%; border: tall {GRAY} 35%; }}
