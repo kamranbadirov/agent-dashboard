@@ -71,6 +71,8 @@ board/
 
 The tile follows "option C": a colored rail on the left, then title and time, the status, and a bottom row with the ticket chip and round repo logos. The tile has no small icon buttons; rename and stop live on the panel's action row. Do not show PR numbers. Each logo opens its PR.
 
+A tile in "Needs you" flashes red until you click it or open it. When the agent asks again later, it flashes again. The board keeps this in memory, so a restart flashes the tiles again.
+
 Tiles are 38 to 48 columns wide, so one tile alone in a section does not stretch across the row. When the board is narrower than 120 columns, as it is beside the agent pane in Rex, the side panel moves under the tiles and takes the board's full width.
 
 A tile is a ticket. The sessions whose main ticket is the same share one tile (`core/group.py`). The main ticket is the first one found: the platform's branch, then the transcript, then the titles of the session's own PRs. A PR is the session's own when the session opened it (`gh pr create` in its transcript) or works on its branch. A PR the session only links does not count. One exception: a review agent (its title says "review") with no ticket takes the ticket of the PRs it reviews, if they all have the same one. The tile shows the most urgent status of its sessions and "N sessions". A session with no ticket keeps a tile of its own.

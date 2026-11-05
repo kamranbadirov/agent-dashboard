@@ -28,6 +28,7 @@ from .widgets.topbar import WIZARD_HIT, TopBar
 from .wizard.screen import WizardScreen
 
 REFRESH_SECONDS = 20
+FLASH_SECONDS = 0.6
 NARROW_COLUMNS = 120
 TILE_MIN, TILE_MAX = 38, 48
 NEW_WORK_LABEL = " + New work  w "
@@ -74,6 +75,7 @@ class Board(App):
         self.procs = []
         self.alert_id = None
         self.picks = {}
+        self.seen = {}
 
     def compose(self) -> ComposeResult:
         yield TopBar(id="top")
@@ -96,6 +98,7 @@ class Board(App):
         self.set_interval(REFRESH_SECONDS, self.load)
         self.set_interval(1, self.refresh_jobs)
         self.set_interval(2, self.load_procs)
+        self.set_interval(FLASH_SECONDS, self.flash)
         self.load_procs()
 
     @work(thread=True, exclusive=True)
@@ -222,7 +225,7 @@ class Board(App):
             header.append(name, style=f"bold {color}")
             header.append(f"  {len(items)}", style=MUTED)
             widgets.append(SectionHeader(header))
-            widgets.append(ItemGrid(*[AgentTile(s) for s in items], min_column_width=TILE_MIN, max_column_width=TILE_MAX))
+            widgets.append(ItemGrid(*[AgentTile(s).set_class(self.unseen(s), "alert") for s in items], min_column_width=TILE_MIN, max_column_width=TILE_MAX))
         if not widgets:
             widgets.append(Static("No agents right now. Start one, and it shows up here.", id="empty"))
         lst.mount_all(widgets)
@@ -424,6 +427,22 @@ class Board(App):
 
     def tile_clicked(self, session):
         self.action_resume()
+
+    def unseen(self, session):
+        sid = session["sessionId"]
+        return session["status"] == "your_move" and (sid not in self.seen or self.seen[sid] != session.get("lastActivity"))
+
+    def mark_seen(self, session):
+        if not session:
+            return
+        self.seen[session["sessionId"]] = session.get("lastActivity")
+        for card in self.cards():
+            if card.session["sessionId"] == session["sessionId"]:
+                card.remove_class("alert")
+
+    def flash(self):
+        for lst in self.screen_stack[0].query("#list"):
+            lst.toggle_class("flash")
 
     def selected(self):
         w = self.focused
@@ -628,6 +647,7 @@ class Board(App):
         self.call_from_thread(self.load)
 
     def action_resume(self):
+        self.mark_seen(self.selected())
         s = self.target()
         if not s:
             return

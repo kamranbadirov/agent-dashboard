@@ -26,6 +26,7 @@ ItemGrid {{ grid-gutter: 1 2; height: auto; margin: 0 0 0 0; }}
 .tile {{ text-wrap: nowrap; height: 6; min-height: 6; padding: 0 1; }}
 .tile.your_move {{ background: {AQUA} 10%; border: tall {AQUA} 35%; }}
 .tile.your_move:focus {{ background: {AQUA} 22%; border: tall {AQUA}; }}
+#list.flash .tile.alert {{ background: {RED} 30%; border: tall {RED}; }}
 .tile.working {{ background: {RED} 10%; border: tall {RED} 35%; }}
 .tile.working:focus {{ background: {RED} 22%; border: tall {RED}; }}
 .tile.setting_up {{ background: {BLUE} 10%; border: tall {BLUE} 35%; }}
