@@ -80,6 +80,7 @@ class AgentTile(Widget, can_focus=True):
         return Text("\n").join(lines)
 
     def on_click(self, event):
+        self.app.mark_seen(self.session)
         offset = event.get_content_offset(self)
         if offset and offset.y == BOTTOM_ROW:
             for start, end, url in self.links:

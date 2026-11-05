@@ -20,7 +20,7 @@ Each agent goes into one group:
 
 | Group | Meaning |
 |-------|---------|
-| **Needs you** | The agent asks a question, waits for a tool approval, or has a PR with comments, failed checks, or an approval to merge. |
+| **Needs you** | The agent asks a question, waits for a tool approval, or has a PR with comments, failed checks, or an approval to merge. The tile flashes red until you click it or open it. |
 | **Running** | The agent works now. |
 | **Reviewing PRs** | The agent reviews a PR that somebody else wrote. |
 | **Waiting on reviewers** | The PR is open and has no action for you. |
