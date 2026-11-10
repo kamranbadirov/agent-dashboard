@@ -79,7 +79,7 @@ def browser(answers):
 
 def review_only(answers):
     ticket = answers["ticket"]
-    return [Command([["claude", f"/devs:code-review {ticket}"]], {}, str(root_dir()), slugify(f"review-only-{ticket}"))]
+    return [Command([["claude", f"/ticket-review {ticket}"]], {}, str(root_dir()), slugify(f"review-only-{ticket}"))]
 
 
 BUILDERS = {"review_only": review_only, "new": new_work, "ticket": new_work, "review": review, "clean": clean, "backend": backend, "browser": browser}
