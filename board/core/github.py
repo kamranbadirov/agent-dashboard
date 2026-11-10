@@ -120,6 +120,7 @@ def fetch_pr(owner, repo, num, stamp=None):
             "closedAt": pr.get("closedAt"),
             "headOid": head,
             "commitsSinceReview": len(newer),
+            "answered": bool(reviews) and pushed_at > max(r.get("submittedAt") or "" for r in reviews),
             "sinceReviewUrl": f"{pr['url']}/files/{base}..{head}" if newer and base and head else None,
         }
     with _pr_lock:

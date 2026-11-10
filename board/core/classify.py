@@ -21,10 +21,10 @@ def action_reasons(info, prs, sess_status):
             if n:
                 reasons.append(f"{n} new commit{'s' if n > 1 else ''} on {ref} since your review")
             continue
-        talk = p["unresolvedThreads"] + p["newComments"]
+        talk = p["newComments"] + (0 if p.get("answered") else p["unresolvedThreads"])
         if talk:
             reasons.append(f"{talk} comment{'s' if talk > 1 else ''} on {ref}")
-        if p["reviewDecision"] == "CHANGES_REQUESTED":
+        if p["reviewDecision"] == "CHANGES_REQUESTED" and not p.get("answered"):
             reasons.append(f"changes requested on {ref}")
         if p["checks"] in ("FAILURE", "ERROR"):
             reasons.append(f"checks failing on {ref}")
