@@ -46,11 +46,11 @@ class WizardScreen(ModalScreen):
     ]
     DEFAULT_CSS = WIZARD_CSS
 
-    def __init__(self, start=None):
+    def __init__(self, start=None, answers=None):
         super().__init__()
         self.start = start
         self.flow = None
-        self.answers = {}
+        self.answers = dict(answers or {})
         self.position = -1
         self.loaded = {}
         self.question = MENU
