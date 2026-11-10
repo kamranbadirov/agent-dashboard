@@ -61,7 +61,7 @@ python3 server.py
 | `o` | Open the session on claude.ai |
 | `p` | Open the first PR |
 | `t` | Open the first Linear ticket |
-| `x` | Close the selected agent, or remove an ended one |
+| `x` | Close the selected agent, or remove an ended one. On a Done tile with a platform, it then opens Clean up with that platform picked. |
 | `s` | Start work on a ticket. Type the ticket ID; Claude reads it in Linear and picks the branch, the backend and the mobile apps. You can change any of them before you start. |
 | `c` | Clean up platforms. Platforms whose PRs are all merged or closed come first. |
 | `n` | Start a new chat. It runs in the root checkout (set `CHAT_DIR` to change it), with no ticket, branch or platform. |

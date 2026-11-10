@@ -548,6 +548,11 @@ class Board(App):
     def action_clean_platforms(self):
         self.push_screen(WizardScreen(start="clean"), lambda result: self.refresh_jobs())
 
+    def offer_clean(self, platform):
+        if platform:
+            answers = {"platforms": [os.path.basename(platform)]}
+            self.push_screen(WizardScreen(start="clean", answers=answers), lambda result: self.refresh_jobs())
+
     def focus_agent(self):
         card = next((c for c in self.cards() if c.session["sessionId"] == self.focused_id), None)
         if card:
@@ -586,13 +591,17 @@ class Board(App):
             self.notify(message, severity="information" if ok else "warning")
             self.refresh_jobs()
             return
+        tile = self.selected()
+        platform = self.platform_dir(s) if tile and tile["status"] == "done" else None
         if not s["alive"]:
             self.dismiss_worker(s["sessionId"])
+            self.offer_clean(platform)
             return
 
         def done(confirmed):
             if confirmed:
                 self.close_worker(s["sessionId"])
+                self.offer_clean(platform)
 
         self.push_screen(ConfirmClose(s["title"], "Stop this agent? You can resume it later.", "stop"), done)
 
