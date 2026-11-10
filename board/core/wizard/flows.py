@@ -147,7 +147,7 @@ NEW_WORK = Flow("new", "Start new work", "New branch, a worktree of every repo, 
     ]),
     SEED,
     Question("agent", "choice", "Start an agent in it?", "Optional. It starts once the platform is ready.", [
-        Option("implement", "Implement the ticket", "Runs /devs:implement with the ticket from the branch name."),
+        Option("implement", "Implement the ticket", "Runs /build-ticket with the ticket from the branch name."),
         Option("none", "No agent", "Only create the platform."),
     ]),
     WHERE,
@@ -211,7 +211,7 @@ BROWSER = Flow("browser", "Shared browser", "The Chrome window that QA agents at
 
 REVIEW_ONLY = Flow("review_only", "Review only", "Start a Claude review agent for a ticket. No platform and no servers.",
                    "claude · under 1 min", [
-    Question("ticket", "text", "Which ticket?", "The agent runs /devs:code-review on it, in the root checkout.",
+    Question("ticket", "text", "Which ticket?", "The agent runs /ticket-review on it, in the root checkout.",
              label="Ticket ID", hint="For example DAT-613.", validate=check_ticket),
     WHERE,
     TERMINAL_APP,

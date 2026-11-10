@@ -11,9 +11,9 @@ def ticket_in(text):
 
 def agent_prompt(flow, answers):
     if flow in NEW_FLOWS:
-        return None if answers["agent"] == "none" else f"/devs:implement {ticket_in(answers['branch'])}".strip()
+        return None if answers["agent"] == "none" else f"/build-ticket {ticket_in(answers['branch'])}".strip()
     if flow == "review":
-        return f"/devs:code-review {answers.get('ticket', '')}".strip()
+        return f"/ticket-review {answers.get('ticket', '')}".strip()
     return None
 
 
@@ -57,7 +57,7 @@ def job_meta(flow, answers, command):
 
 def start_review_agent(answers):
     ticket = answers["ticket"]
-    return agents.start_agent(str(root_dir()), f"/devs:code-review {ticket}", answers["where"],
+    return agents.start_agent(str(root_dir()), f"/ticket-review {ticket}", answers["where"],
                               answers.get("terminal_app"), f"Review {ticket}")
 
 
