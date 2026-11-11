@@ -56,6 +56,7 @@ class Board(App):
         Binding("X", "close_done", "Close all done", show=False),
         Binding("e", "toggle_inactive", "Inactive"),
         Binding("a", "toggle_chats", "Chats"),
+        Binding("i", "toggle_details", "Details"),
         Binding("r", "refresh", "Refresh"),
         Binding("u", "plain_refresh", "Plain words", show=False),
         Binding("escape", "clear_filter", "Clear filter", show=False),
@@ -76,6 +77,7 @@ class Board(App):
         self.alert_id = None
         self.picks = {}
         self.seen = {}
+        self.details = False
 
     def compose(self) -> ComposeResult:
         yield TopBar(id="top")
@@ -340,7 +342,8 @@ class Board(App):
         record = self.tmux_record(session)
         if self.in_rex and record:
             self.show_in_pane(record["sessionId"], focus=False, open_new=False)
-        in_panel = bool(record) and not self.in_rex
+        in_panel = bool(record) and not self.in_rex and not self.details
+        self.query_one("#side").display = self.details or in_panel
         self.query_one("#terminal").display = in_panel
         self.query_one("#preview").display = not in_panel
         if in_panel:
@@ -427,6 +430,16 @@ class Board(App):
 
     def tile_clicked(self, session):
         self.action_resume()
+
+    def details_clicked(self, session):
+        same = self.focused_id == session["sessionId"]
+        self.focused_id = session["sessionId"]
+        self.details = not (self.details and same)
+        self.show_side(session)
+
+    def action_toggle_details(self):
+        self.details = not self.details
+        self.show_side(self.selected())
 
     def unseen(self, session):
         sid = session["sessionId"]
