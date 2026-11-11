@@ -77,10 +77,8 @@ def pr_stub(pr):
 
 def with_agent_record(session, record):
     """A new agent has no transcript yet, so its tile would show only a session ID. Fill in what the
-    board knows from starting it: the name typed in the wizard, the ticket, the branch and where it runs."""
+    board knows from starting it: the ticket, the branch and where it runs."""
     session = dict(session)
-    if not session.get("customTitle"):
-        session["title"] = record["title"]
     session["tickets"] = session["tickets"] or list(dict.fromkeys(tickets_in(f"{record['title']} {record['prompt']}")))[:2]
     session["gitBranch"] = session.get("gitBranch") or record.get("branch")
     session["name"] = session.get("name") or PLACES.get(record["where"])
