@@ -3,6 +3,12 @@ import re
 
 from .config import PR_RE, REMINDER_RE, TAIL_BYTES, TICKET_DENY_PREFIXES, TICKET_DENYLIST, TICKET_RE
 
+TICKET_BYTES_RE = re.compile(TICKET_RE.pattern.encode())
+WORK_TICKET_RES = (
+    re.compile(r"\b([A-Z]{2,6}-\d{1,5})/(?:feat|fix|chore|refactor|task|hotfix|bug)/"),
+    re.compile(r"^\s*(?i:(?:please |now |let'?s |can you )?(?:/\S+|implement|build|fix|review|work on|pick up|start|continue)\s+(?:on |the )?(?:ticket )?)([A-Z]{2,6}-\d{1,5})\b"),
+)
+
 
 def read_tail(path):
     size = path.stat().st_size
@@ -67,6 +73,28 @@ def conversation_prs(path):
             for owner, repo, num in PR_RE.findall(REMINDER_RE.sub("", text_of(rec.get("message")))):
                 prs[f"{owner}/{repo}#{num}"] = (owner, repo, int(num))
     return prs
+
+
+def prompt_ticket(path):
+    found = None
+    with open(path, "rb") as f:
+        for line in f:
+            if b'"type":"user"' not in line or not TICKET_BYTES_RE.search(line):
+                continue
+            try:
+                rec = json.loads(line)
+            except Exception:
+                continue
+            if rec.get("isMeta"):
+                continue
+            text = text_of(rec.get("message"))
+            if text.startswith("<"):
+                continue
+            text = REMINDER_RE.sub("", text)
+            tickets = [m for r in WORK_TICKET_RES for m in r.findall(text) if tickets_in(m)]
+            if tickets:
+                found = tickets[-1]
+    return found
 
 
 def is_pr_create(block):
@@ -180,6 +208,8 @@ def parse_transcript(path):
         for t in tickets_in(src or ""):
             if t not in priority:
                 priority.append(t)
+    if not priority:
+        priority = [t for t in [prompt_ticket(path)] if t]
     info["tickets"] = priority[:4]
     info["prs"] = list(prs.values())
     info["createdPrs"] = created_prs(path)
