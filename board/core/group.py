@@ -33,19 +33,20 @@ def ticket_title(ticket, sessions, prs):
 
 def ticket_item(ticket, sessions):
     ordered = newest_first(sessions)
-    urgent = min(ordered, key=rank)
+    agents = [s for s in ordered if not s.get("proc") and not s.get("job")] or ordered
+    urgent = min(agents, key=rank)
     prs = merged_prs(ordered)
     tickets = list(dict.fromkeys([ticket] + [t for s in ordered for t in s["tickets"]]))
     return {
         **urgent,
         "sessionId": f"ticket:{ticket}",
-        "title": ticket_title(ticket, ordered, prs),
+        "title": ticket_title(ticket, agents, prs),
         "tickets": tickets,
         "prs": prs,
         "alive": any(s.get("alive") for s in ordered),
         "lastActivity": ordered[0].get("lastActivity"),
         "group": ordered,
-        "lead": lead_of(ordered),
+        "lead": lead_of(agents),
         "job": None,
         "proc": None,
     }

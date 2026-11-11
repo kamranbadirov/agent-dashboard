@@ -34,7 +34,7 @@ def proc_session(proc):
         "lastUserPrompt": None, "pendingTool": None,
         "pendingQuestion": ("Finished." if not failed else f"Exited with code {proc['exitCode']}.") if proc["dead"] else "Running. Select it to see the output.",
         "lastActivity": datetime.fromtimestamp(proc["created"], timezone.utc).isoformat(),
-        "cwd": None, "gitBranch": None, "remoteUrl": None, "resumeCmd": None, "proc": proc,
+        "cwd": proc.get("cwd"), "gitBranch": None, "remoteUrl": None, "resumeCmd": None, "proc": proc,
     }
 
 
