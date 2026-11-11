@@ -10,6 +10,8 @@ from .repo_image import HEIGHT, WIDTH, RepoImage
 MAX_IMAGES = 3
 GAP = 1
 BOTTOM_ROW = 3
+STATUS_ROW = 1
+INFO = "ⓘ"
 
 
 class AgentTile(Widget, can_focus=True):
@@ -60,6 +62,9 @@ class AgentTile(Widget, can_focus=True):
         title.append(" " * max(1, width - title.cell_len - len(when)))
         title.append(when, style=MUTED)
         status = Text(label, style=f"bold {color}")
+        status.truncate(max(1, width - 2), overflow="ellipsis")
+        status.append(" " * max(1, width - status.cell_len - 1))
+        status.append(INFO, style=MUTED)
         ask = Text(s.get("pendingQuestion") or "", style=MUTED)
         bottom, links = ticket_line(s)
         if s.get("job"):
@@ -82,10 +87,13 @@ class AgentTile(Widget, can_focus=True):
     def on_click(self, event):
         self.app.mark_seen(self.session)
         offset = event.get_content_offset(self)
+        if offset and offset.y == STATUS_ROW and offset.x >= self.size.width - 4:
+            self.app.details_clicked(self.session)
+            return
         if offset and offset.y == BOTTOM_ROW:
             for start, end, url in self.links:
                 if start <= offset.x < end:
                     self.app.open_url(url)
                     return
-        if event.chain >= 2:
+        if event.chain == 1:
             self.app.tile_clicked(self.session)
