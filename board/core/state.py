@@ -78,6 +78,10 @@ def build_state():
         entries.append((sid, path, meta, True))
     for sid, path in recent_ended(set(live)):
         entries.append((sid, path, None, False))
+    seen = {sid for sid, *_ in entries}
+    for sid in agents.registry():
+        if sid not in seen:
+            entries.append((sid, find_transcript(sid), None, False))
 
     parsed = []
     for sid, path, meta, alive in entries:
@@ -144,7 +148,8 @@ def build_state():
                 "busy": (meta or {}).get("status") == "busy",
                 "status": status,
                 "reasons": reasons,
-                "title": info.get("title") or (info.get("firstPrompt") or "")[:80] or sid[:8],
+                "title": info.get("title") or (info.get("firstPrompt") or "")[:80]
+                         or (agents.registry().get(sid) or {}).get("title") or sid[:8],
                 "tickets": tickets,
                 "summary": info.get("summary"),
                 "lastAssistant": (info.get("lastAssistant") or "")[-600:],
