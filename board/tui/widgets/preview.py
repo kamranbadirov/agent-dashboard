@@ -70,8 +70,10 @@ class SessionRow(Static):
         text.append(f"  {ago(session['lastActivity'])}", style=MUTED)
         self.update(text)
 
-    def on_click(self):
+    def on_click(self, event):
         self.app.action_pick(self.index)
+        if event.chain >= 2:
+            self.app.action_resume()
 
 
 PLAIN_PARTS = [("big_picture", "Big picture"), ("what", "What it is"), ("why", "Why it matters"), ("done_when", "Done when")]

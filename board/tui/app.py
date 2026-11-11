@@ -266,7 +266,6 @@ class Board(App):
             return
         self.picks[s["sessionId"]] = index
         self.show_side(s)
-        self.action_resume()
 
     def actions_for(self, session):
         target = self.picked(session)
