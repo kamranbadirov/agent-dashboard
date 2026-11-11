@@ -1,7 +1,7 @@
 import json
 import os
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 
 from rich.text import Text
 from textual import work
@@ -11,6 +11,7 @@ from textual.containers import Horizontal, ItemGrid, Vertical, VerticalScroll
 from textual.widgets import Footer, Static
 
 from ..core import agents, jobs, plain, procs, ptyhost, rexpane
+from ..core.classify import parse_time
 from ..core.group import group
 from ..core.notify import notify_needs_you, notify_new_commits
 from ..core.root import RootMissing, platform_of, root_dir
@@ -78,6 +79,7 @@ class Board(App):
         self.picks = {}
         self.seen = {}
         self.details = False
+        self.stopped = {}
 
     def compose(self) -> ComposeResult:
         yield TopBar(id="top")
@@ -197,7 +199,20 @@ class Board(App):
         top.hits = hits
         top.update(t)
 
+    def hide_now(self, session_id):
+        self.stopped[session_id] = datetime.now(timezone.utc)
+        if self.state:
+            self.apply_state(self.state, force=True)
+
+    def hide_stopped(self, state):
+        for s in state["sessions"]:
+            stopped = self.stopped.get(s["sessionId"])
+            last = parse_time(s.get("lastActivity"))
+            if stopped and (not last or last <= stopped):
+                s["dismissed"], s["alive"] = True, False
+
     def apply_state(self, state, force=False):
+        self.hide_stopped(state)
         sig = json.dumps([(s["sessionId"], s["status"], s["reasons"], s["title"], s["lastActivity"],
                            [(p["key"], p["state"], p["unresolvedThreads"], p["newComments"]) for p in s["prs"]])
                           for s in state["sessions"]]
@@ -658,6 +673,8 @@ class Board(App):
     def close_worker(self, session_id):
         ok, message = stop_session(session_id)
         self.call_from_thread(self.notify, message, severity="information" if ok else "error")
+        if ok:
+            self.call_from_thread(self.hide_now, session_id)
         self.call_from_thread(self.load)
 
     @work(thread=True)
@@ -665,6 +682,8 @@ class Board(App):
         ok, message = dismiss_session(session_id)
         if not ok:
             self.call_from_thread(self.notify, message, severity="error")
+        else:
+            self.call_from_thread(self.hide_now, session_id)
         self.call_from_thread(self.load)
 
     def action_resume(self):
