@@ -48,18 +48,24 @@ def is_terminal(key):
     return key.startswith(key_for(TERM, ""))
 
 
-def tickets_of(key):
+def folder_of(key):
     kind, _, name = key[len(PREFIX):].partition("-")
     if kind != "run":
-        return []
+        return None
     try:
-        return tickets_in(platform_branch(root_dir().parent / name) or "")
+        return str(root_dir().parent / name)
     except Exception:
-        return []
+        return None
+
+
+def tickets_of(key):
+    folder = folder_of(key)
+    branch = (platform_branch(folder) or "") if folder else ""
+    return tickets_in(branch) or tickets_in(branch.upper())
 
 
 def listed():
-    return [dict(p, title=title_of(p["key"]), tickets=tickets_of(p["key"]))
+    return [dict(p, title=title_of(p["key"]), tickets=tickets_of(p["key"]), cwd=folder_of(p["key"]))
             for p in ptyhost.sessions() if p["key"].startswith(PREFIX)]
 
 
