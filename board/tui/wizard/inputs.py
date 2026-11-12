@@ -94,7 +94,11 @@ class TextField(Vertical):
         self.check()
 
     def focus(self, scroll_visible=True):
-        self.query_one(Input).focus()
+        found = self.query(Input)
+        if found:
+            found.first().focus()
+        elif self.is_attached:
+            self.call_after_refresh(self.focus)
         return self
 
     def answer(self):
@@ -219,7 +223,11 @@ class MultiField(Vertical):
         yield Callout("Pick at least one.", kind="error", id="field-error")
 
     def focus(self, scroll_visible=True):
-        self.query_one(CheckList).focus()
+        found = self.query(CheckList)
+        if found:
+            found.first().focus()
+        elif self.is_attached:
+            self.call_after_refresh(self.focus)
         return self
 
     def answer(self):
