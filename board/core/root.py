@@ -14,9 +14,13 @@ class RootMissing(Exception):
 
 
 def root_dir():
-    if not (ROOT_REPO / "scripts" / "new.sh").is_file():
+    if not (ROOT_REPO / "bin" / "root").is_file():
         raise RootMissing(f"No root checkout at {ROOT_REPO}. Set ROOT_REPO to its path.")
     return ROOT_REPO
+
+
+def root_bin():
+    return str(root_dir() / "bin" / "root")
 
 
 def root_const(module, name):

@@ -5,7 +5,7 @@ import socket
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
-from ..root import platform_dir, root_const, root_dir, slugify
+from ..root import platform_dir, root_bin, root_const, root_dir, slugify
 from .commands import NEW_FLOWS, review_slug
 
 PROXY_PORT = 443
@@ -68,12 +68,12 @@ def has_aws():
 def has_shared_database():
     volume = root_const("pikachu", "SHARED_DB_VOLUME")
     return check("Shared pikachu database", succeeds(["docker", "volume", "inspect", volume]),
-                 "make backend, from the root folder", ["make", "backend"])
+                 "bin/root up --backend, from the root folder", [root_bin(), "up", "--backend"])
 
 
 def has_shared_backend():
-    return check("Shared backend up", shared_backend_up(), "make backend. The platform can still be created.",
-                 ["make", "backend"], warn=True)
+    return check("Shared backend up", shared_backend_up(), "bin/root up --backend. The platform can still be created.",
+                 [root_bin(), "up", "--backend"], warn=True)
 
 
 def folder_free(slug):

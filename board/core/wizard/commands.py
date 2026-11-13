@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-from ..root import platform_dir, root_dir, slugify
+from ..root import platform_dir, repo_names, root_bin, root_const, root_dir, slugify
 
-PREPARE = [["make", "prepare"], ["make", "_source_repos"]]
+UNATTENDED = ["--yes", "--json"]
 NEW_FLOWS = ("new", "ticket")
 PLATFORM_FLOWS = NEW_FLOWS + ("review",)
 IN_TMUX_FLOWS = ("backend",)
@@ -19,15 +19,14 @@ class Command:
     platform: str = ""
 
 
-def yes_no(value):
-    return "yes" if value in ("yes", "isolated") else "no"
+def backend_flag(answers):
+    return "--backend" if answers["backend"] == "isolated" else "--no-backend"
 
 
-def backend_env(answers):
-    env = {"BACKEND": yes_no(answers["backend"])}
-    if answers["backend"] == "isolated":
-        env["SEED_DEMO"] = "1" if answers.get("seed") == "yes" else "0"
-    return env
+def repos_flag(answers):
+    if answers.get("mobile") != "yes":
+        return []
+    return ["--repos", ",".join((root_const("repos", "REQUIRED_REPO_NAMES") or []) + repo_names(mobile=True))]
 
 
 def review_specs(answers):
@@ -48,27 +47,27 @@ def review_slug(answers):
 
 def new_work(answers):
     slug = slugify(answers["branch"])
-    env = {"BRANCH": answers["branch"], "SLUG": slug, "MOBILE": answers["mobile"], "TOOLS": "no", **backend_env(answers)}
-    return [Command(PREPARE + [["bash", "scripts/new.sh"]], env, str(root_dir()), slug, str(platform_dir(slug)))]
+    argv = [root_bin(), "new", answers["branch"], "--slug", slug, backend_flag(answers), *repos_flag(answers), *UNATTENDED]
+    return [Command([argv], {}, str(root_dir()), slug, str(platform_dir(slug)))]
 
 
 def review(answers):
     slug = review_slug(answers)
-    env = {"PRS": " ".join(review_specs(answers)), "SLUG": slug, **backend_env(answers)}
-    return [Command(PREPARE + [["bash", "scripts/review.sh"]], env, str(root_dir()), slug, str(platform_dir(slug)))]
+    argv = [root_bin(), "new", *review_specs(answers), "--slug", slug, backend_flag(answers), *UNATTENDED]
+    return [Command([argv], {}, str(root_dir()), slug, str(platform_dir(slug)))]
 
 
 def clean(answers):
     return [
-        Command([["bash", "scripts/clean.sh"]], {"PLATFORM": name, "YES": "1"}, str(root_dir()), name[len("platform-"):])
+        Command([[root_bin(), "rm", name[len("platform-"):], *UNATTENDED]], {}, str(root_dir()), name[len("platform-"):])
         for name in answers["platforms"]
     ]
 
 
 def backend(answers):
     if answers["action"] == "stop":
-        return [Command([["make", "backend-stop"]], {"YES": "1"}, str(root_dir()), "backend")]
-    return [Command([["make", "backend"]], {}, str(root_dir()), "backend")]
+        return [Command([[root_bin(), "down", "--backend", "--yes"]], {}, str(root_dir()), "backend")]
+    return [Command([[root_bin(), "up", "--backend"]], {}, str(root_dir()), "backend")]
 
 
 def browser(answers):
@@ -96,15 +95,5 @@ def describe(command):
 
 
 def expected_steps(flow, answers):
-    """The stages root's scripts usually announce, so progress can show what is still ahead.
-    Steps that root announces but this list lacks are added as they appear."""
-    if flow == "clean":
-        return ["Tearing down " + name for name in answers["platforms"]]
-    if flow not in PLATFORM_FLOWS:
-        return []
-    first = ["Creating root worktree", "Fetching latest develop", "Adding child-repo worktrees"]
-    if flow == "review":
-        first = ["Searching open PRs", "Creating review platform", "Fetching PR branches", "Adding child-repo worktrees"]
-    mobile = ["Adding mobile-app worktrees"] if answers.get("mobile") == "yes" else []
-    backend = ["Bootstrapping isolated pikachu backend"] if answers.get("backend") == "isolated" else []
-    return first + mobile + ["Writing .worktree.env + env files", "Copying local files"] + backend + ["Frontend deps"]
+    """Root prints its plan first, so the steps come from the plan once the job starts."""
+    return []
