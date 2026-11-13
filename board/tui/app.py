@@ -597,15 +597,9 @@ class Board(App):
 
     def remove_clicked(self, session):
         self.focused_id = session["sessionId"]
-        self.action_close_agent(confirm=False)
+        self.action_close_agent()
 
-    def ask(self, confirm, dialog, callback):
-        if confirm:
-            self.push_screen(dialog, callback)
-        else:
-            callback(True)
-
-    def action_close_agent(self, confirm=True):
+    def action_close_agent(self):
         s = self.target()
         if not s:
             return
@@ -621,7 +615,7 @@ class Board(App):
                     self.notify(message, severity="information" if ok else "warning")
                     self.load_procs()
 
-            self.ask(confirm, ConfirmClose(s["title"], "Stop this program?", "stop"), stop)
+            self.push_screen(ConfirmClose(s["title"], "Stop this program?", "stop"), stop)
             return
         if s["sessionId"].startswith("job:"):
             ok, message = jobs.dismiss(s["sessionId"][len("job:"):])
@@ -640,7 +634,7 @@ class Board(App):
                 self.close_worker(s["sessionId"])
                 self.offer_clean(platform)
 
-        self.ask(confirm, ConfirmClose(s["title"], "Stop this agent? You can resume it later.", "stop"), done)
+        self.push_screen(ConfirmClose(s["title"], "Stop this agent? You can resume it later.", "stop"), done)
 
     def action_close_done(self):
         found = done_and_live((self.state or {}).get("sessions", []))
