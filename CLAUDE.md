@@ -69,7 +69,7 @@ board/
 
 ## Design
 
-The tile follows "option C": a colored rail on the left, then title and time, the status, and a bottom row with the ticket chip and round repo logos. The tile has no small icon buttons; rename and stop live on the panel's action row. Do not show PR numbers. Each logo opens its PR.
+The tile follows "option C": a colored rail on the left, then title and time, the status, and a bottom row with the ticket chip and round repo logos. The tile has two small buttons at its right edge: ⓘ on the status row shows the details, and ✕ under it stops the tile's session, or dismisses an ended one. ✕ does the same as `x` then `y`, with no dialog. Rename lives on the panel's action row. Do not show PR numbers. Each logo opens its PR.
 
 A tile in "Needs you" flashes red until you click it or open it, then it turns a darker red. When the agent asks again later, it flashes again. The board keeps this in memory, so a restart flashes the tiles again.
 
