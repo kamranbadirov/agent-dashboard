@@ -28,7 +28,7 @@ PR_QUERY = """
 query($owner:String!,$repo:String!,$num:Int!){
   repository(owner:$owner,name:$repo){
     pullRequest(number:$num){
-      number title url state isDraft reviewDecision headRefName updatedAt closedAt
+      number title url state isDraft reviewDecision mergeable headRefName updatedAt closedAt
       author{login}
       comments(last:30){nodes{author{login} createdAt}}
       reviews(last:30){nodes{author{login} state submittedAt commit{oid}}}
@@ -111,6 +111,7 @@ def fetch_pr(owner, repo, num, stamp=None):
             "state": pr["state"],
             "isDraft": pr["isDraft"],
             "reviewDecision": pr.get("reviewDecision"),
+            "mergeable": pr.get("mergeable"),
             "branch": pr.get("headRefName"),
             "unresolvedThreads": len(unresolved),
             "newComments": len(new_comments),
