@@ -7,7 +7,6 @@ from .config import ROOT_REPO
 from .github import branch_prs
 
 ENV_LINE_RE = re.compile(r"^(\w+)='(.*)'$")
-ARRAY_RE = r"^{name}=\(([^)]*)\)"
 
 
 class RootMissing(Exception):
@@ -20,20 +19,19 @@ def root_dir():
     return ROOT_REPO
 
 
-def lib_text():
-    return (root_dir() / "scripts" / "_lib.sh").read_text()
+def root_const(module, name):
+    text = (root_dir() / "src" / "lib" / f"{module}.ts").read_text()
+    match = re.search(rf"\bconst {name}\s*=\s*(\[[^\]]*\]|\"[^\"]*\"|\d+)", text)
+    if not match:
+        return None
+    value = match.group(1)
+    if value.startswith("["):
+        return re.findall(r'"([^"]+)"', value)
+    return value.strip('"')
 
 
 def repo_names(mobile=False):
-    # root's _lib.sh is the one list of repos, so read it instead of copying it here
-    name = "MOBILE_REPOS" if mobile else "ALL_REPOS"
-    match = re.search(ARRAY_RE.format(name=name), lib_text(), re.M)
-    return match.group(1).split() if match else []
-
-
-def lib_value(name):
-    match = re.search(rf'^{name}="?([^"\n]+)"?$', lib_text(), re.M)
-    return match.group(1) if match else None
+    return root_const("repos", "MOBILE_REPO_NAMES" if mobile else "APP_REPO_NAMES") or []
 
 
 def slugify(text):
@@ -46,7 +44,7 @@ FRONTEND_DIRS = {"raichu": "raichu", "portals": "Charmander/portals", "ditto": "
 def platform_urls(branch, isolated):
     label = slugify(branch.rsplit("/", 1)[-1])
     urls = {name: f"https://{label}.{name}.localhost" for name in FRONTEND_DIRS}
-    slug = slugify(branch)[: int(lib_value("DEV_HOST_LABEL_LENGTH") or 60)]
+    slug = slugify(branch)[: int(root_const("platform", "DNS_LABEL_LENGTH") or 60)]
     urls["pikachu"] = f"https://{slug}.pikachu.localhost" if isolated else "https://pikachu.localhost"
     return urls
 
