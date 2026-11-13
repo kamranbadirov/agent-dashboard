@@ -2,7 +2,7 @@ import os
 import re
 
 from . import ptyhost
-from .root import platform_branch, root_dir
+from .root import platform_branch, root_bin, root_dir
 from .transcript import tickets_in
 
 PREFIX = "proc-"
@@ -34,7 +34,7 @@ def start(kind, name, argv, cwd, env=None):
 
 
 def start_dev_servers(platform):
-    return start("run", os.path.basename(platform), ["make", "run"], platform)
+    return start("run", os.path.basename(platform), [root_bin(), "up"], platform)
 
 
 def start_terminal(cwd):

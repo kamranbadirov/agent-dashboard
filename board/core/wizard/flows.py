@@ -111,7 +111,6 @@ def terminal_options(answers):
     return [Option(name, name) for name in installed_terminals()]
 
 
-is_isolated = lambda a: a.get("backend") == "isolated"
 wants_agent = lambda a: a.get("agent") != "none"
 in_terminal = lambda a: a.get("where") == "terminal" and wants_agent(a) and not rexpane.available()
 
@@ -119,10 +118,6 @@ BACKEND = Question("backend", "choice", "Which backend?", "Frontends always run.
     Option("shared", "Shared backend", "Uses the pikachu already running. No extra RAM, no AWS."),
     Option("isolated", "Its own backend", "Own pikachu and database. About 1 GiB RAM, needs an AWS login."),
 ])
-SEED = Question("seed", "choice", "Add demo data?", "Adds a QA event, an attendee login and profile fields.", [
-    Option("no", "No", "Empty database copied from the shared one."),
-    Option("yes", "Yes", "Add the demo event."),
-], when=is_isolated)
 def where_options(answers):
     if rexpane.available():
         return [Option("background", "In the board", "Select its tile to see it in the pane beside the board."),
@@ -136,7 +131,7 @@ WHERE = Question("where", "choice", "Where should the agent run?", "It always ru
 TERMINAL_APP = Question("terminal_app", "choice", "Which terminal app?", "", terminal_options, when=in_terminal)
 
 NEW_WORK = Flow("new", "Start new work", "New branch, a worktree of every repo, dependencies installed.",
-                "make new · about 3 to 6 min", [
+                "root new · about 3 to 6 min", [
     Question("branch", "text", "Which branch?", "The same name is used in every repo.", label="Branch name",
              hint="Start with the Linear ticket ID, for example ADX-123/feat/email-fix.",
              validate=check_branch, preview=branch_preview),
@@ -145,7 +140,6 @@ NEW_WORK = Flow("new", "Start new work", "New branch, a worktree of every repo, 
         Option("no", "No", "Web only."),
         Option("yes", "Yes", "Also set up ProjectGo and OnSite."),
     ]),
-    SEED,
     Question("agent", "choice", "Start an agent in it?", "Optional. It starts once the platform is ready.", [
         Option("implement", "Implement the ticket", "Runs /build-ticket with the ticket from the branch name."),
         Option("none", "No agent", "Only create the platform."),
@@ -156,19 +150,19 @@ NEW_WORK = Flow("new", "Start new work", "New branch, a worktree of every repo, 
 
 def infer_ticket(answers):
     guess = infer(answers["ticket"])
-    return {"branch": guess["branch"], "backend": guess["backend"], "mobile": guess["mobile"], "seed": "no",
+    return {"branch": guess["branch"], "backend": guess["backend"], "mobile": guess["mobile"],
             "agent": "implement", "where": "background", "_why": guess["why"]}
 
 
 TICKET = Flow("ticket", "Work on a ticket", "Give the ticket ID. Claude reads it and fills in the rest.",
-              "make new · about 3 to 6 min", [
+              "root new · about 3 to 6 min", [
     Question("ticket", "text", "Which ticket?", "Claude reads it in Linear and picks the branch and the backend.",
              label="Ticket ID", hint="For example DAT-593.", validate=check_ticket),
     *[replace(q, inferred=True) for q in NEW_WORK.questions],
 ], infer=infer_ticket)
 
 REVIEW = Flow("review", "Review pull requests", "Check out PR branches by ticket or PR number and run the app.",
-              "make review · about 3 to 6 min", [
+              "root new <PRs> · about 3 to 6 min", [
     Question("find", "choice", "Which pull requests?", "Search by Linear ticket, or name the PRs yourself.", [
         Option("ticket", "Linear ticket", "Finds open PRs in every repo that mention the ticket."),
         Option("prs", "PR numbers", "You give repo and number, such as pikachu=4521."),
@@ -180,13 +174,12 @@ REVIEW = Flow("review", "Review pull requests", "Check out PR branches by ticket
     Question("picked", "multi", "Pick the PRs", "Selected repos run the PR branch. The rest run develop.", pr_options,
              validate=check_picked, when=lambda a: a.get("find") == "ticket"),
     BACKEND,
-    SEED,
     WHERE,
     TERMINAL_APP,
 ])
 
 CLEAN = Flow("clean", "Clean up a platform", "Delete a worktree, its docker stack and its branches.",
-             "make clean · under 1 min", [
+             "root rm · under 1 min", [
     Question("platforms", "multi", "Which platforms?", "Select one or more to delete.", platform_options, validate=check_picked),
 ], typed_confirm=lambda a: DELETE_WORD, confirm_note=clean_note)
 
@@ -199,7 +192,7 @@ def backend_options(answers):
 
 
 BACKEND_FLOW = Flow("backend", "Shared backend", "Start or pause the pikachu backend that platforms share.",
-                    "make backend · make backend-stop", [
+                    "root up --backend · root down --backend", [
     Question("action", "choice", "Start or stop the shared backend?", "", backend_options),
 ], typed_confirm=lambda a: "stop" if a.get("action") == "stop" else None,
    confirm_note=lambda a: "Every platform on the shared backend loses its API until you start it again. Type stop to confirm.")
@@ -220,7 +213,7 @@ REVIEW_ONLY = Flow("review_only", "Review only", "Start a Claude review agent fo
 FLOWS = {f.key: f for f in (TICKET, NEW_WORK, REVIEW, REVIEW_ONLY, CLEAN, BACKEND_FLOW, BROWSER)}
 
 
-SHORT = {"branch": "Branch", "backend": "Backend", "mobile": "Mobile apps", "seed": "Demo data", "agent": "Agent",
+SHORT = {"branch": "Branch", "backend": "Backend", "mobile": "Mobile apps", "agent": "Agent",
          "where": "Runs", "terminal_app": "Terminal app", "find": "Search by", "ticket": "Ticket", "specs": "PRs",
          "picked": "PRs", "platforms": "Platforms", "action": "Action"}
 for _flow in FLOWS.values():

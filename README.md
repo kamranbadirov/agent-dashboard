@@ -68,7 +68,7 @@ python3 server.py
 | `c` | Clean up platforms. Platforms whose PRs are all merged or closed come first. |
 | `n` | Start a new chat. It runs in the root checkout (set `CHAT_DIR` to change it), with no ticket, branch or platform. |
 | `R` | Rename the selected agent |
-| `D` | Start the dev servers (`make run`) of the selected tile's platform. Inside Rex they open in the pane below the agent. A second `D` shows the running ones. |
+| `D` | Start the dev servers (`bin/root up`) of the selected tile's platform. Inside Rex they open in the pane below the agent. A second `D` shows the running ones. |
 | `w` | Open the work wizard: new work, PR review, review only (a Claude review agent with no platform), clean up, the shared backend and the shared browser. |
 | `e` | Show or hide inactive and done agents |
 | `a` | Show or hide chats with no ticket or PR. `e` still decides about ended and done ones. |
