@@ -26,6 +26,8 @@ def action_reasons(info, prs, sess_status):
             reasons.append(f"{talk} comment{'s' if talk > 1 else ''} on {ref}")
         if p["reviewDecision"] == "CHANGES_REQUESTED" and not p.get("answered"):
             reasons.append(f"changes requested on {ref}")
+        if p.get("mergeable") == "CONFLICTING":
+            reasons.append(f"resolve conflicts on {ref}")
         if p["checks"] in ("FAILURE", "ERROR"):
             reasons.append(f"checks failing on {ref}")
         if p["reviewDecision"] == "APPROVED" and not p["isDraft"]:
