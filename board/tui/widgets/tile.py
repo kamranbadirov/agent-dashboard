@@ -11,7 +11,9 @@ MAX_IMAGES = 3
 GAP = 1
 BOTTOM_ROW = 3
 STATUS_ROW = 1
+ASK_ROW = 2
 INFO = "ⓘ"
+REMOVE = "✕"
 
 
 class AgentTile(Widget, can_focus=True):
@@ -66,6 +68,9 @@ class AgentTile(Widget, can_focus=True):
         status.append(" " * max(1, width - status.cell_len - 1))
         status.append(INFO, style=MUTED)
         ask = Text(s.get("pendingQuestion") or "", style=MUTED)
+        ask.truncate(max(1, width - 2), overflow="ellipsis")
+        ask.append(" " * max(1, width - ask.cell_len - 1))
+        ask.append(REMOVE, style=MUTED)
         bottom, links = ticket_line(s)
         if s.get("job"):
             bottom = progress_bar(s["job"].progress, max(1, width - 8))
@@ -89,6 +94,9 @@ class AgentTile(Widget, can_focus=True):
         offset = event.get_content_offset(self)
         if offset and offset.y == STATUS_ROW and offset.x >= self.size.width - 4:
             self.app.details_clicked(self.session)
+            return
+        if offset and offset.y == ASK_ROW and offset.x >= self.size.width - 4:
+            self.app.remove_clicked(self.session)
             return
         if offset and offset.y == BOTTOM_ROW:
             for start, end, url in self.links:

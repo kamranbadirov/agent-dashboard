@@ -62,6 +62,7 @@ python3 server.py
 | `p` | Open the first PR |
 | `t` | Open the first Linear ticket |
 | `i` | Show or hide the details of the selected tile: actions, "In plain words" and "What you need to do". The ⓘ on a tile does the same. |
+| ✕ on a tile | Stop the tile's session, or dismiss an ended one. Same as `x` then `y`. |
 | `x` | Close the selected agent, or remove an ended one. On a Done tile with a platform, it then opens Clean up with that platform picked. |
 | `s` | Start work on a ticket. Type the ticket ID; Claude reads it in Linear and picks the branch, the backend and the mobile apps. You can change any of them before you start. |
 | `c` | Clean up platforms. Platforms whose PRs are all merged or closed come first. |
