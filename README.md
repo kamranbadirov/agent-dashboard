@@ -126,6 +126,8 @@ Set these environment variables to change the defaults:
 | `INFER_MODEL` | `haiku` | The Claude model that reads a ticket when you press `s`. |
 | `CHAT_DIR` | the root checkout | The folder where `n` starts a new chat. It must exist. If it is a git repo, keep it on a branch with no ticket ID. |
 | `AUTO_CLOSE_MERGED` | `0` | Set to `1` to let the dashboard close idle agents whose PRs are all merged or closed. |
+| `GITHUB_ORG` | `pheedloop` | The GitHub org whose PRs the board searches. |
+| `LINEAR_WORKSPACE` | the value of `GITHUB_ORG` | The Linear workspace in the ticket links. |
 
 Example:
 
@@ -156,4 +158,4 @@ Imports only point down: `tui` uses `core`, never the other way round.
 ## Notes
 
 - The dashboard caches PR data for 5 minutes to limit GitHub API calls.
-- The PR search and ticket links point to the `pheedloop` GitHub org and Linear workspace. Change them in `board/core/github.py` and `board/tui/app.py` for your own org.
+- The PR search and ticket links point to the `pheedloop` GitHub org and Linear workspace. Set `GITHUB_ORG` and `LINEAR_WORKSPACE` for your own org.
