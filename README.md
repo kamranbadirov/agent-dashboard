@@ -35,7 +35,7 @@ The dashboard is a terminal board (TUI, a text interface that runs in the termin
 - [Claude Code](https://claude.com/claude-code)
 - [GitHub CLI](https://cli.github.com/), logged in with `gh auth login`
 - [tmux](https://github.com/tmux/tmux) (`brew install tmux`). It hosts the agents that the board starts.
-- macOS (the terminal board uses `open` to open links)
+- macOS. On Linux, links open with `xdg-open`, but `make setup`, the notifications and the wizard still need macOS.
 
 ## Install
 
