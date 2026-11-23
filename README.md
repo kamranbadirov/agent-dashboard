@@ -6,6 +6,7 @@
 ![GitHub CLI](https://img.shields.io/badge/needs-gh%20CLI-181717?logo=github)
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey?logo=apple)
 ![Dependencies](https://img.shields.io/badge/server-no%20dependencies-brightgreen)
+![Tests](https://github.com/kamranbadirov/agent-dashboard/actions/workflows/tests.yml/badge.svg)
 
 A local board that shows all your Claude Code agents in one place.
 It tells you which agents are running, which ones need you, and what state their pull requests are in.
@@ -135,6 +136,16 @@ Example:
 ENDED_LOOKBACK_HOURS=24 python3 server.py
 ```
 
+## Tests
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest
+.venv/bin/python -m pyflakes board tests
+```
+
+The tests need no `gh` login, no tmux and no Claude Code session. GitHub Actions runs them on every pull request.
+
 ## Project layout
 
 ```
@@ -147,10 +158,12 @@ board/
     sessions.py        live and ended sessions, close an agent
     classify.py        decide which group an agent belongs to
     store.py           dismissed.json and titles.json
+    links.py           ticket links, and the program that opens a URL
     state.py           build_state(), the one function the board calls
     notify.py          desktop notifications for new commits
   assets/              repo images; add <repo>.png to show a new repo
   tui/                 terminal board: app, theme, icons, format, widgets/, screens
+tests/                 pytest tests for core/ and tui/format.py
 ```
 
 Imports only point down: `tui` uses `core`, never the other way round.

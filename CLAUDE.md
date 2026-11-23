@@ -7,9 +7,11 @@ A local board for Claude Code agents. It reads `~/.claude/` session files, asks 
 - `make setup`: install gh, tmux, the icon font and Python 3.11, create `.venv`, install `requirements.txt`
 - `make tui` (or `python3 server.py`): terminal board
 - `python3 server.py --json`: print the state once, useful to check a change in `core/`
-- `.venv/bin/python -m pyflakes board`: lint (install pyflakes in the venv first)
+- `.venv/bin/pip install -r requirements-dev.txt`: install pytest and pyflakes
+- `.venv/bin/python -m pytest`: run the tests
+- `.venv/bin/python -m pyflakes board tests`: lint
 
-There is no test suite. Check a change by comparing `--json` output before and after, and by using Textual's `App.run_test()` for a headless check.
+The tests in `tests/` cover `core/` and `tui/format.py`. They do not call `gh`, `tmux` or `claude`, and they do not read `~/.claude/`. GitHub Actions runs them and pyflakes on every pull request (`.github/workflows/tests.yml`). For the board itself, compare `--json` output before and after a change, and use Textual's `App.run_test()` for a headless check.
 
 ## Layout
 
@@ -25,6 +27,7 @@ board/
     group.py         one tile for each ticket: group sessions by their main ticket
     plain.py         "In plain words": Haiku explains a ticket simply; cached in plain.json
     store.py         dismissed.json and titles.json
+    links.py         ticket links, and the program that opens a URL
     assets.py        repo images found in board/assets
     state.py         build_state(), the one function the board calls
     notify.py        desktop notifications for new commits and for agents that need you
@@ -47,6 +50,7 @@ board/
 
 - Imports only point down: `tui` uses `core`, never the reverse.
 - New actions (rename, close, dismiss) go in `core/`. The board only calls them.
+- A change in `core/` comes with a test. A test patches `gh_json`, `my_login` and the file paths in `config`, so it never leaves the test's temp folder.
 - Repo logos come from `board/assets/<repo>.png`. To add a repo, add the file. Do not list repos in code.
 - The terminal board needs Python 3.10+ because of `textual-image`. Its dependencies are pinned in `requirements.txt` because `tui/widgets/repo_image.py` uses `textual-image` internals.
 - Terminal layout comes in whole rows and columns. Spacing in pixels (such as 8px) can only be matched sideways, not vertically.
