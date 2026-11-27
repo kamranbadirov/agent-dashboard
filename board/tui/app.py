@@ -1,6 +1,5 @@
 import json
 import os
-import subprocess
 from datetime import datetime, timezone
 
 from rich.text import Text
@@ -13,6 +12,7 @@ from textual.widgets import Footer, Static
 from ..core import agents, jobs, plain, procs, ptyhost, rexpane
 from ..core.classify import parse_time
 from ..core.group import group
+from ..core.links import open_url, ticket_url
 from ..core.notify import notify_needs_you, notify_new_commits
 from ..core.root import RootMissing, platform_of, root_dir
 from ..core.sessions import close_all, done_and_live
@@ -507,7 +507,7 @@ class Board(App):
             self.apply_state(self.state, force=True)
 
     def open_url(self, url):
-        subprocess.Popen(["open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        open_url(url)
 
     def action_open_session(self):
         s = self.target()
@@ -526,7 +526,7 @@ class Board(App):
     def action_open_ticket(self):
         s = self.selected()
         if s and s["tickets"]:
-            self.open_url(f"https://linear.app/pheedloop/issue/{s['tickets'][0]}")
+            self.open_url(ticket_url(s["tickets"][0]))
         elif s:
             self.notify("This session has no ticket.")
 

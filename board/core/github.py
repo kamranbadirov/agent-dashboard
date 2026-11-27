@@ -3,7 +3,7 @@ import subprocess
 import threading
 import time
 
-from .config import PR_CACHE_SECONDS
+from .config import GITHUB_ORG, PR_CACHE_SECONDS
 
 
 _pr_cache = {}
@@ -138,7 +138,7 @@ def my_open_prs():
             return cached[1]
     data = gh_json(
         [
-            "search", "prs", "--author=@me", "--owner=pheedloop", "--state=open",
+            "search", "prs", "--author=@me", f"--owner={GITHUB_ORG}", "--state=open",
             "--limit", "60", "--json", "number,title,repository,url",
         ]
     ) or []
@@ -156,7 +156,7 @@ def reviewed_prs():
             return cached[1]
     data = gh_json(
         [
-            "search", "prs", "--reviewed-by=@me", "--owner=pheedloop", "--state=open",
+            "search", "prs", "--reviewed-by=@me", f"--owner={GITHUB_ORG}", "--state=open",
             "--limit", "40", "--json", "number,title,repository,url,author,updatedAt",
         ]
     ) or []
@@ -174,7 +174,7 @@ def branch_prs(repo, branch):
         if cached and now - cached[0] < PR_CACHE_SECONDS:
             return cached[1]
     data = gh_json(
-        ["pr", "list", "--repo", f"pheedloop/{repo}", "--head", branch, "--state", "all", "--json", "number,state"]
+        ["pr", "list", "--repo", f"{GITHUB_ORG}/{repo}", "--head", branch, "--state", "all", "--json", "number,state"]
     )
     if data is None:
         return []

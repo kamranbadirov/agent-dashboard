@@ -9,3 +9,4 @@ agents.json
 terminals/
 tasks/
 plain.json
+.pytest_cache/

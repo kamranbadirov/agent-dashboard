@@ -18,7 +18,8 @@ NEEDS_YOU_FILE = HOME / ".claude" / "agent-dashboard-needs-you.json"
 NOTIFY_NEEDS_YOU = os.environ.get("NOTIFY_NEEDS_YOU", "1") != "0"
 TAIL_BYTES = 600_000
 
-GITHUB_ORG = "pheedloop"
+GITHUB_ORG = os.environ.get("GITHUB_ORG") or "pheedloop"
+LINEAR_WORKSPACE = os.environ.get("LINEAR_WORKSPACE") or GITHUB_ORG
 
 
 def find_root_repo():
